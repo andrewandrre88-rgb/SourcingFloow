@@ -1,0 +1,333 @@
+     1	import React, { useState, useEffect, useCallback, useRef } from 'react';
+     2	import { User } from 'firebase/auth';
+     3	import {
+     4	  initAuth,
+     5	  googleSignIn,
+     6	  logout,
+     7	} from './lib/firebase';
+     8	import {
+     9	  syncUserProfile,
+    10	  subscribeToUserInquiries,
+    11	  saveInquiryToFirestore,
+    12	  deleteInquiryFromFirestore,
+    13	  subscribeToUserExchangeRates,
+    14	  saveExchangeRatesToFirestore,
+    15	  migrateLocalDataToFirestoreIfEmpty,
+    16	} from './lib/firestoreDb';
+    17	import {
+    18	  getSavedExchangeRates,
+    19	  saveExchangeRates,
+    20	  STORAGE_KEY_LOCAL_INQUIRIES,
+    21	  STORAGE_KEY_CURRENCY_VIEW,
+    22	  calculateInquiryPricing,
+    23	} from './lib/currency';
+    24	import { SAMPLE_INQUIRIES } from './lib/sampleData';
+    25	import { InquiryItem, OrderStatus, CloudSyncState, ExchangeRates, CurrencyViewMode, Customer } from './types';
+    26	import { Header } from './components/Header';
+    27	import { Sidebar } from './components/Sidebar';
+    28	import { KanbanBoard } from './components/KanbanBoard';
+    29	import { SuppliersPage } from './components/SuppliersPage';
+    30	import { LogisticsCalculator } from './components/LogisticsCalculator';
+    31	import { AppView, Supplier } from './types';
+    32	import { StatsBar } from './components/StatsBar';
+    33	import { InquiryTable } from './components/InquiryTable';
+    34	import { InquiryModal } from './components/InquiryModal';
+    35	import { InquiryDetailModal } from './components/InquiryDetailModal';
+    36	import { DeleteConfirmModal } from './components/DeleteConfirmModal';
+    37	import { QuoteExportModal } from './components/QuoteExportModal';
+    38	import { ExchangeRateModal } from './components/ExchangeRateModal';
+    39	import { AuthPage } from './components/AuthPage';
+    40	import { CustomersPage } from './components/CustomersPage';
+    41	import { CustomerModal } from './components/CustomerModal';
+    42	import { subscribeToCustomers, saveCustomerToFirestore, deleteCustomerFromFirestore } from './lib/customersDb';
+    43	import {
+    44	  CheckCircle2,
+    45	  AlertCircle,
+    46	  Cloud,
+    47	  Plus,
+    48	  RefreshCw,
+    49	} from 'lucide-react';
+    50	
+    51	export default function App() {
+    52	  // Auth state
+    53	  const [user, setUser] = useState<User | null>(null);
+    54	  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+    55	  const [needsAuth, setNeedsAuth] = useState(false);
+    56	  const [isLoggingIn, setIsLoggingIn] = useState(false);
+    57	  const [loginError, setLoginError] = useState<string | null>(null);
+    58	
+    59	  // Global Currency View Preference ('USD' | 'RMB' | 'DUAL')
+    60	  const [currencyView, setCurrencyView] = useState<CurrencyViewMode>(() => {
+    61	    try {
+    62	      const saved = localStorage.getItem(STORAGE_KEY_CURRENCY_VIEW);
+    63	      if (saved === 'USD' || saved === 'RMB' || saved === 'DUAL') {
+    64	        return saved;
+    65	      }
+    66	    } catch {
+    67	      // ignore
+    68	    }
+    69	    return 'USD';
+    70	  });
+    71	
+    72	  const handleCurrencyViewChange = (mode: CurrencyViewMode) => {
+    73	    setCurrencyView(mode);
+    74	    try {
+    75	      localStorage.setItem(STORAGE_KEY_CURRENCY_VIEW, mode);
+    76	    } catch {
+    77	      // ignore
+    78	    }
+    79	  };
+    80	
+    81	  // Firestore Real-Time Sync state
+    82	  const [syncState, setSyncState] = useState<CloudSyncState>({
+    83	    lastSyncedAt: null,
+    84	    isSyncing: true,
+    85	    error: null,
+    86	    status: 'syncing',
+    87	    itemCount: 0,
+    88	  });
+    89	
+    90	  // Exchange Rates
+    91	  const [exchangeRates, setExchangeRates] = useState<ExchangeRates>(getSavedExchangeRates);
+    92	
+    93	  // Inquiries State (Firestore is the single source of truth)
+    94	  const [customers, setCustomers] = useState<Customer[]>([]);
+    95	  const [currentView, setCurrentView] = useState<AppView>('dashboard');
+    96	  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    97	  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+    98	  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
+    99	  const [customerToEdit, setCustomerToEdit] = useState<Customer | null>(null);
+   100	
+   101	  const [inquiries, setInquiries] = useState<InquiryItem[]>(() => {
+   102	    try {
+   103	      const cached = localStorage.getItem(STORAGE_KEY_LOCAL_INQUIRIES);
+   104	      if (cached) {
+   105	        return JSON.parse(cached);
+   106	      }
+   107	    } catch (e) {
+   108	      console.error('Failed to load local inquiries cache:', e);
+   109	    }
+   110	    return SAMPLE_INQUIRIES;
+   111	  });
+   112	
+   113	  // Modals state
+   114	  const [isInquiryModalOpen, setIsInquiryModalOpen] = useState(false);
+   115	  const [inquiryToEdit, setInquiryToEdit] = useState<InquiryItem | null>(null);
+   116	  const [itemToView, setItemToView] = useState<InquiryItem | null>(null);
+   117	  const [itemToDelete, setItemToDelete] = useState<InquiryItem | null>(null);
+   118	  const [itemToShare, setItemToShare] = useState<InquiryItem | null>(null);
+   119	  const [isRatesModalOpen, setIsRatesModalOpen] = useState(false);
+   120	  const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+   121	
+   122	  const showToast = (text: string, type: 'success' | 'error' | 'info' = 'info') => {
+   123	    setToastMessage({ text, type });
+   124	    setTimeout(() => setToastMessage(null), 4000);
+   125	  };
+   126	
+   127	  // Cache locally only as an offline cache backup
+   128	  useEffect(() => {
+   129	    try {
+   130	      localStorage.setItem(STORAGE_KEY_LOCAL_INQUIRIES, JSON.stringify(inquiries));
+   131	    } catch (e) {
+   132	      console.error('Failed to cache to local storage:', e);
+   133	    }
+   134	  }, [inquiries]);
+   135	
+   136	  // Auth state listener on mount
+   137	  useEffect(() => {
+   138	    const unsubscribe = initAuth(
+   139	      (authenticatedUser) => {
+   140	        setUser(authenticatedUser);
+   141	        setNeedsAuth(false);
+   142	        setIsLoadingAuth(false);
+   143	      },
+   144	      () => {
+   145	        setUser(null);
+   146	        setNeedsAuth(true);
+   147	        setIsLoadingAuth(false);
+   148	      }
+   149	    );
+   150	
+   151	    return (
+   152	    <div className="flex h-screen bg-slate-50 overflow-hidden">
+   153	      <Sidebar 
+   154	        currentView={currentView}
+   155	        onViewChange={setCurrentView}
+   156	        user={user}
+   157	        onLogin={handleLogin}
+   158	        onLogout={handleLogout}
+   159	        isLoggingIn={isLoggingIn}
+   160	        isOpen={isSidebarOpen}
+   161	        onClose={() => setIsSidebarOpen(false)}
+   162	      />
+   163	      
+   164	      <div className="flex-1 flex flex-col w-0 overflow-hidden">
+   165	        <Header 
+   166	          user={user}
+   167	          needsAuth={needsAuth}
+   168	          syncState={syncState}
+   169	          exchangeRates={exchangeRates}
+   170	          currencyView={currencyView}
+   171	          onCurrencyViewChange={setCurrencyView}
+   172	          onLogin={handleLogin}
+   173	          onLogout={handleLogout}
+   174	          onSync={handleManualSync}
+   175	          onOpenNewModal={() => {
+   176	            if (currentView === 'customers') {
+   177	              setCustomerToEdit(null);
+   178	              setIsCustomerModalOpen(true);
+   179	            } else {
+   180	              setInquiryToEdit(null);
+   181	              setIsInquiryModalOpen(true);
+   182	            }
+   183	          }}
+   184	          onOpenRatesModal={() => setIsRatesModalOpen(true)}
+   185	          isLoggingIn={isLoggingIn}
+   186	          currentView={currentView}
+   187	          onSidebarToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+   188	        />
+   189	
+   190	        <main className="flex-1 overflow-y-auto">
+   191	          {currentView === 'dashboard' && (
+   192	            <>
+   193	              <StatsBar inquiries={inquiries} exchangeRates={exchangeRates} />
+   194	              <InquiryTable 
+   195	                inquiries={inquiries}
+   196	                exchangeRates={exchangeRates}
+   197	                usdToRmbRate={exchangeRates.USD_TO_RMB}
+   198	                currencyView={currencyView}
+   199	                onView={(item) => setItemToView(item)}
+   200	                onEdit={(item) => {
+   201	                  setInquiryToEdit(item);
+   202	                  setIsInquiryModalOpen(true);
+   203	                }}
+   204	                onDeleteRequest={handleDeleteRequest}
+   205	                onStatusChange={handleStatusChange}
+   206	                onQuickShare={(item) => setItemToShare(item)}
+   207	              />
+   208	            </>
+   209	          )}
+   210	          
+   211	          {currentView === 'kanban' && (
+   212	            <KanbanBoard 
+   213	              inquiries={inquiries}
+   214	              usdToRmbRate={exchangeRates.USD_TO_RMB}
+   215	              onEdit={(item) => {
+   216	                setInquiryToEdit(item);
+   217	                setIsInquiryModalOpen(true);
+   218	              }}
+   219	              onStatusChange={handleStatusChange}
+   220	            />
+   221	          )}
+   222	
+   223	          {currentView === 'customers' && (
+   224	            <CustomersPage 
+   225	              customers={customers}
+   226	              onAdd={() => {
+   227	                setCustomerToEdit(null);
+   228	                setIsCustomerModalOpen(true);
+   229	              }}
+   230	              onEdit={(customer) => {
+   231	                setCustomerToEdit(customer);
+   232	                setIsCustomerModalOpen(true);
+   233	              }}
+   234	              onDelete={handleDeleteCustomer}
+   235	            />
+   236	          )}
+   237	
+   238	          {currentView === 'suppliers' && (
+   239	            <SuppliersPage 
+   240	              suppliers={suppliers}
+   241	              onAdd={() => alert("Supplier Add flow coming soon!")}
+   242	              onEdit={(supplier) => alert("Supplier Edit flow coming soon!")}
+   243	            />
+   244	          )}
+   245	
+   246	          {currentView === 'logistics' && (
+   247	            <LogisticsCalculator />
+   248	          )}
+   249	
+   250	        </main>
+   251	      </div>
+   252	
+   253	      {/* Modals */}
+   254	      <InquiryDetailModal
+   255	        isOpen={Boolean(itemToView)}
+   256	        inquiry={itemToView}
+   257	        usdToRmbRate={exchangeRates.USD_TO_RMB}
+   258	        onClose={() => setItemToView(null)}
+   259	        onEdit={(item) => {
+   260	          setItemToView(null);
+   261	          setInquiryToEdit(item);
+   262	          setIsInquiryModalOpen(true);
+   263	        }}
+   264	        onShare={(item) => {
+   265	          setItemToView(null);
+   266	          setItemToShare(item);
+   267	        }}
+   268	        onStatusChange={handleStatusChange}
+   269	      />
+   270	      <InquiryModal
+   271	        isOpen={isInquiryModalOpen}
+   272	        onClose={() => {
+   273	          setIsInquiryModalOpen(false);
+   274	          setInquiryToEdit(null);
+   275	        }}
+   276	        onSave={handleSaveInquiry}
+   277	        inquiryToEdit={inquiryToEdit}
+   278	        exchangeRates={exchangeRates}
+   279	        existingCount={inquiries.length}
+   280	      />
+   281	      <DeleteConfirmModal
+   282	        isOpen={Boolean(itemToDelete)}
+   283	        onClose={() => setItemToDelete(null)}
+   284	        onConfirm={handleConfirmDelete}
+   285	        inquiryNumber={itemToDelete?.inquiryNumber}
+   286	      />
+   287	      <QuoteExportModal
+   288	        isOpen={Boolean(itemToShare)}
+   289	        onClose={() => setItemToShare(null)}
+   290	        inquiry={itemToShare}
+   291	        usdToRmbRate={exchangeRates.USD_TO_RMB}
+   292	      />
+   293	      <ExchangeRateModal
+   294	        isOpen={isRatesModalOpen}
+   295	        onClose={() => setIsRatesModalOpen(false)}
+   296	        rates={exchangeRates}
+   297	        onSave={handleUpdateRates}
+   298	      />
+   299	      <CustomerModal 
+   300	        isOpen={isCustomerModalOpen}
+   301	        onClose={() => {
+   302	          setIsCustomerModalOpen(false);
+   303	          setCustomerToEdit(null);
+   304	        }}
+   305	        onSave={handleSaveCustomer}
+   306	        customerToEdit={customerToEdit}
+   307	      />
+   308	      
+   309	      {/* Toast Notification */}
+   310	      {toastMessage && (
+   311	        <div className={`fixed bottom-4 right-4 max-w-sm w-full shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black/5 p-4 ${
+   312	          toastMessage.type === 'error' ? 'bg-rose-50 text-rose-800' : 'bg-white text-slate-800'
+   313	        }`}>
+   314	          <div className="flex items-start gap-3">
+   315	            {toastMessage.type === 'success' ? (
+   316	              <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+   317	            ) : toastMessage.type === 'error' ? (
+   318	              <AlertCircle className="w-5 h-5 text-rose-500 shrink-0" />
+   319	            ) : (
+   320	              <div className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
+   321	                <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
+   322	              </div>
+   323	            )}
+   324	            <p className="text-sm font-medium">{toastMessage.text}</p>
+   325	          </div>
+   326	        </div>
+   327	      )}
+   328	    </div>
+   329	  );
+   330	}
+   331	
+   332	
+   333	export default App;

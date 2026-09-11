@@ -89,13 +89,14 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
  */
 export async function syncUserProfile(user: User): Promise<void> {
   if (!user || !user.uid) return;
-  const path = `users/${user.uid}`;
+  const uid = String(user.uid);
+  const path = `users/${uid}`;
   try {
-    const userRef = doc(db, 'users', user.uid);
+    const userRef = doc(db, 'users', uid);
     await setDoc(
       userRef,
       {
-        uid: user.uid,
+        uid: uid,
         email: user.email || '',
         displayName: user.displayName || '',
         photoURL: user.photoURL || '',
@@ -118,13 +119,14 @@ export function subscribeToUserInquiries(
   onData: (inquiries: InquiryItem[]) => void,
   onError?: (error: Error) => void
 ): () => void {
-  if (!userId) {
+  const uid = typeof userId === 'string' ? userId : (userId as any)?.uid ? String((userId as any).uid) : '';
+  if (!uid) {
     onData([]);
     return () => {};
   }
 
-  const path = `users/${userId}/inquiries`;
-  const inquiriesRef = collection(db, 'users', userId, 'inquiries');
+  const path = `users/${uid}/inquiries`;
+  const inquiriesRef = collection(db, 'users', uid, 'inquiries');
   const q = query(inquiriesRef, orderBy('updatedAt', 'desc'));
 
   const unsubscribe = onSnapshot(
@@ -202,16 +204,18 @@ export async function saveInquiryToFirestore(
   userId: string,
   inquiry: InquiryItem
 ): Promise<void> {
-  if (!userId) throw new Error('User ID is required to save inquiry to Firestore');
-  if (!inquiry.id) throw new Error('Inquiry ID is required');
+  const uid = typeof userId === 'string' ? userId : (userId as any)?.uid ? String((userId as any).uid) : '';
+  if (!uid) throw new Error('User ID is required to save inquiry to Firestore');
+  if (!inquiry || !inquiry.id) throw new Error('Inquiry ID is required');
 
-  const path = `users/${userId}/inquiries/${inquiry.id}`;
-  const inquiryRef = doc(db, 'users', userId, 'inquiries', inquiry.id);
+  const inqId = String(inquiry.id);
+  const path = `users/${uid}/inquiries/${inqId}`;
+  const inquiryRef = doc(db, 'users', uid, 'inquiries', inqId);
 
   // Clean data payload, omitting undefined values for Firestore compatibility
   const cleanPayload: Record<string, any> = {
-    id: inquiry.id,
-    userId: userId,
+    id: inqId,
+    userId: uid,
     inquiryNumber: inquiry.inquiryNumber,
     date: inquiry.date,
     customerName: inquiry.customerName,
@@ -284,11 +288,15 @@ export async function saveInquiryToFirestore(
  */
 export async function deleteInquiryFromFirestore(
   userId: string,
-  inquiryId: string
+  inquiryId: string | { id?: string }
 ): Promise<void> {
-  if (!userId || !inquiryId) return;
-  const path = `users/${userId}/inquiries/${inquiryId}`;
-  const inquiryRef = doc(db, 'users', userId, 'inquiries', inquiryId);
+  const uid = typeof userId === 'string' ? userId : (userId as any)?.uid ? String((userId as any).uid) : '';
+  const resolvedId = typeof inquiryId === 'object' && inquiryId !== null ? inquiryId.id : inquiryId;
+  const inqId = resolvedId ? String(resolvedId) : '';
+  if (!uid || !inqId) return;
+
+  const path = `users/${uid}/inquiries/${inqId}`;
+  const inquiryRef = doc(db, 'users', uid, 'inquiries', inqId);
   try {
     await deleteDoc(inquiryRef);
   } catch (error) {
@@ -304,10 +312,11 @@ export function subscribeToUserExchangeRates(
   userId: string,
   onData: (rates: ExchangeRates) => void
 ): () => void {
-  if (!userId) return () => {};
+  const uid = typeof userId === 'string' ? userId : (userId as any)?.uid ? String((userId as any).uid) : '';
+  if (!uid) return () => {};
 
-  const path = `users/${userId}/settings/rates`;
-  const ratesRef = doc(db, 'users', userId, 'settings', 'rates');
+  const path = `users/${uid}/settings/rates`;
+  const ratesRef = doc(db, 'users', uid, 'settings', 'rates');
 
   return onSnapshot(
     ratesRef,
@@ -334,9 +343,10 @@ export async function saveExchangeRatesToFirestore(
   userId: string,
   rates: ExchangeRates
 ): Promise<void> {
-  if (!userId) return;
-  const path = `users/${userId}/settings/rates`;
-  const ratesRef = doc(db, 'users', userId, 'settings', 'rates');
+  const uid = typeof userId === 'string' ? userId : (userId as any)?.uid ? String((userId as any).uid) : '';
+  if (!uid) return;
+  const path = `users/${uid}/settings/rates`;
+  const ratesRef = doc(db, 'users', uid, 'settings', 'rates');
   try {
     await setDoc(
       ratesRef,
@@ -363,21 +373,24 @@ export async function migrateLocalDataToFirestoreIfEmpty(
   localInquiries: InquiryItem[],
   localRates?: ExchangeRates
 ): Promise<{ migrated: boolean; count: number }> {
-  if (!userId) return { migrated: false, count: 0 };
-  const path = `users/${userId}/inquiries`;
+  const uid = typeof userId === 'string' ? userId : (userId as any)?.uid ? String((userId as any).uid) : '';
+  if (!uid) return { migrated: false, count: 0 };
+  const path = `users/${uid}/inquiries`;
 
   try {
-    const inquiriesRef = collection(db, 'users', userId, 'inquiries');
+    const inquiriesRef = collection(db, 'users', uid, 'inquiries');
     const existingSnap = await getDocs(inquiriesRef);
 
-    if (existingSnap.empty && localInquiries && localInquiries.length > 0) {
+    if (existingSnap.empty && Array.isArray(localInquiries) && localInquiries.length > 0) {
       const batch = writeBatch(db);
 
       for (const item of localInquiries) {
-        const docRef = doc(db, 'users', userId, 'inquiries', item.id);
+        if (!item || !item.id) continue;
+        const itemId = String(item.id);
+        const docRef = doc(db, 'users', uid, 'inquiries', itemId);
         const cleanPayload: Record<string, any> = {
-          id: item.id,
-          userId: userId,
+          id: itemId,
+          userId: uid,
           inquiryNumber: item.inquiryNumber,
           date: item.date,
           customerName: item.customerName,
@@ -425,7 +438,7 @@ export async function migrateLocalDataToFirestoreIfEmpty(
 
       // Also migrate exchange rates if provided
       if (localRates) {
-        const ratesRef = doc(db, 'users', userId, 'settings', 'rates');
+        const ratesRef = doc(db, 'users', uid, 'settings', 'rates');
         batch.set(
           ratesRef,
           {

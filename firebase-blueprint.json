@@ -5,11 +5,26 @@
       "path": "/users/{userId}",
       "description": "User profile and preferences",
       "fields": {
-        "email": { "type": "string", "required": true },
-        "displayName": { "type": "string", "required": false },
-        "photoURL": { "type": "string", "required": false },
-        "createdAt": { "type": "string", "required": true },
-        "lastLoginAt": { "type": "string", "required": true }
+        "email": {
+          "type": "string",
+          "required": true
+        },
+        "displayName": {
+          "type": "string",
+          "required": false
+        },
+        "photoURL": {
+          "type": "string",
+          "required": false
+        },
+        "createdAt": {
+          "type": "string",
+          "required": true
+        },
+        "lastLoginAt": {
+          "type": "string",
+          "required": true
+        }
       }
     },
     "UserSettings": {
@@ -17,10 +32,22 @@
       "path": "/users/{userId}/settings/{settingId}",
       "description": "User exchange rates and dashboard configurations",
       "fields": {
-        "USD_TO_RMB": { "type": "number", "required": true },
-        "EUR_TO_RMB": { "type": "number", "required": true },
-        "GBP_TO_RMB": { "type": "number", "required": true },
-        "updatedAt": { "type": "string", "required": true }
+        "USD_TO_RMB": {
+          "type": "number",
+          "required": true
+        },
+        "EUR_TO_RMB": {
+          "type": "number",
+          "required": true
+        },
+        "GBP_TO_RMB": {
+          "type": "number",
+          "required": true
+        },
+        "updatedAt": {
+          "type": "string",
+          "required": true
+        }
       }
     },
     "Inquiry": {
@@ -28,45 +55,213 @@
       "path": "/users/{userId}/inquiries/{inquiryId}",
       "description": "Client sourcing inquiries, 1688 product details, quotes, and margin calculations",
       "fields": {
-        "id": { "type": "string", "required": true },
-        "inquiryNumber": { "type": "string", "required": true },
-        "date": { "type": "string", "required": true },
-        "customerName": { "type": "string", "required": true },
-        "customerContact": { "type": "string", "required": false },
-        "wechatId": { "type": "string", "required": false },
-        "country": { "type": "string", "required": true },
-        "product": { "type": "string", "required": true },
-        "imageUrl": { "type": "string", "required": false },
-        "material": { "type": "string", "required": false },
-        "colorVariant": { "type": "string", "required": false },
-        "packagingType": { "type": "string", "required": false },
-        "hsCode": { "type": "string", "required": false },
-        "boxLengthCm": { "type": "number", "required": false },
-        "boxWidthCm": { "type": "number", "required": false },
-        "boxHeightCm": { "type": "number", "required": false },
-        "pcsPerBox": { "type": "number", "required": false },
-        "unitWeightG": { "type": "number", "required": false },
-        "grossWeightKg": { "type": "number", "required": false },
-        "netWeightKg": { "type": "number", "required": false },
-        "productUrl1688": { "type": "string", "required": false },
-        "supplierName": { "type": "string", "required": false },
-        "quantity": { "type": "number", "required": true },
-        "price1688Rmb": { "type": "number", "required": true },
-        "domesticShippingRmb": { "type": "number", "required": false },
-        "quotes": { "type": "array", "required": false },
-        "selectedQuoteId": { "type": "string", "required": false },
-        "marginPercent": { "type": "number", "required": true },
-        "marginFixedUsd": { "type": "number", "required": false },
-        "clientUnitPriceUsd": { "type": "number", "required": true },
-        "totalQuotationUsd": { "type": "number", "required": true },
-        "estimatedProfitUsd": { "type": "number", "required": true },
-        "helperCommissions": { "type": "array", "required": false },
-        "totalHelperCommissionUsd": { "type": "number", "required": false },
-        "netAgentProfitUsd": { "type": "number", "required": false },
-        "orderStatus": { "type": "string", "required": true },
-        "notes": { "type": "string", "required": false },
-        "updatedAt": { "type": "string", "required": true },
-        "userId": { "type": "string", "required": true }
+        "id": {
+          "type": "string",
+          "required": true
+        },
+        "inquiryNumber": {
+          "type": "string",
+          "required": true
+        },
+        "date": {
+          "type": "string",
+          "required": true
+        },
+        "customerName": {
+          "type": "string",
+          "required": true
+        },
+        "customerContact": {
+          "type": "string",
+          "required": false
+        },
+        "wechatId": {
+          "type": "string",
+          "required": false
+        },
+        "country": {
+          "type": "string",
+          "required": true
+        },
+        "product": {
+          "type": "string",
+          "required": true
+        },
+        "imageUrl": {
+          "type": "string",
+          "required": false
+        },
+        "material": {
+          "type": "string",
+          "required": false
+        },
+        "colorVariant": {
+          "type": "string",
+          "required": false
+        },
+        "packagingType": {
+          "type": "string",
+          "required": false
+        },
+        "hsCode": {
+          "type": "string",
+          "required": false
+        },
+        "boxLengthCm": {
+          "type": "number",
+          "required": false
+        },
+        "boxWidthCm": {
+          "type": "number",
+          "required": false
+        },
+        "boxHeightCm": {
+          "type": "number",
+          "required": false
+        },
+        "pcsPerBox": {
+          "type": "number",
+          "required": false
+        },
+        "unitWeightG": {
+          "type": "number",
+          "required": false
+        },
+        "grossWeightKg": {
+          "type": "number",
+          "required": false
+        },
+        "netWeightKg": {
+          "type": "number",
+          "required": false
+        },
+        "productUrl1688": {
+          "type": "string",
+          "required": false
+        },
+        "supplierName": {
+          "type": "string",
+          "required": false
+        },
+        "quantity": {
+          "type": "number",
+          "required": true
+        },
+        "price1688Rmb": {
+          "type": "number",
+          "required": true
+        },
+        "domesticShippingRmb": {
+          "type": "number",
+          "required": false
+        },
+        "quotes": {
+          "type": "array",
+          "required": false
+        },
+        "selectedQuoteId": {
+          "type": "string",
+          "required": false
+        },
+        "marginPercent": {
+          "type": "number",
+          "required": true
+        },
+        "marginFixedUsd": {
+          "type": "number",
+          "required": false
+        },
+        "clientUnitPriceUsd": {
+          "type": "number",
+          "required": true
+        },
+        "totalQuotationUsd": {
+          "type": "number",
+          "required": true
+        },
+        "estimatedProfitUsd": {
+          "type": "number",
+          "required": true
+        },
+        "helperCommissions": {
+          "type": "array",
+          "required": false
+        },
+        "totalHelperCommissionUsd": {
+          "type": "number",
+          "required": false
+        },
+        "netAgentProfitUsd": {
+          "type": "number",
+          "required": false
+        },
+        "orderStatus": {
+          "type": "string",
+          "required": true
+        },
+        "notes": {
+          "type": "string",
+          "required": false
+        },
+        "updatedAt": {
+          "type": "string",
+          "required": true
+        },
+        "userId": {
+          "type": "string",
+          "required": true
+        }
+      }
+    },
+    "Customer": {
+      "collection": "users/{userId}/customers",
+      "path": "/users/{userId}/customers/{customerId}",
+      "description": "Customer database for saving clients and potential customers",
+      "fields": {
+        "id": {
+          "type": "string",
+          "required": true
+        },
+        "name": {
+          "type": "string",
+          "required": true
+        },
+        "contactEmail": {
+          "type": "string",
+          "required": false
+        },
+        "contactPhone": {
+          "type": "string",
+          "required": false
+        },
+        "whatsapp": {
+          "type": "string",
+          "required": false
+        },
+        "wechatId": {
+          "type": "string",
+          "required": false
+        },
+        "country": {
+          "type": "string",
+          "required": false
+        },
+        "type": {
+          "type": "string",
+          "required": true
+        },
+        "notes": {
+          "type": "string",
+          "required": false
+        },
+        "createdAt": {
+          "type": "string",
+          "required": true
+        },
+        "updatedAt": {
+          "type": "string",
+          "required": true
+        }
       }
     }
   },

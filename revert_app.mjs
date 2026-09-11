@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import fs from 'fs';
+
+const appCode = `import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { User } from 'firebase/auth';
 import {
   initAuth,
@@ -164,7 +166,7 @@ export default function App() {
     if (user && user.uid) {
       try {
         await deleteInquiryFromFirestore(user.uid, idToDelete);
-        showToast(`Deleted inquiry ${itemToDelete.inquiryNumber}`, 'success');
+        showToast(\`Deleted inquiry \${itemToDelete.inquiryNumber}\`, 'success');
       } catch (e) {
         console.error(e);
       }
@@ -201,7 +203,7 @@ export default function App() {
       try {
         setSyncState((prev) => ({ ...prev, isSyncing: true }));
         await saveInquiryToFirestore(user.uid, savedItem);
-        showToast(`Saved inquiry ${savedItem.inquiryNumber}`, 'success');
+        showToast(\`Saved inquiry \${savedItem.inquiryNumber}\`, 'success');
         setSyncState(prev => ({ ...prev, isSyncing: false }));
       } catch (error: any) {
         console.error('Failed to save inquiry to Firestore:', error);
@@ -225,16 +227,14 @@ export default function App() {
     if (user && user.uid) {
       try {
         await saveCustomerToFirestore(user.uid, savedCustomer);
-        showToast(`Saved customer ${savedCustomer.name}`, 'success');
+        showToast(\`Saved customer \${savedCustomer.name}\`, 'success');
       } catch (error: any) {
         console.error('Failed to save customer to Firestore:', error);
       }
     }
   };
 
-  const handleDeleteCustomer = async (customerOrId: Customer | string) => {
-    const id = typeof customerOrId === 'object' && customerOrId !== null ? customerOrId.id : customerOrId;
-    if (!id) return;
+  const handleDeleteCustomer = async (id: string) => {
     setCustomers(prev => prev.filter(c => c.id !== id));
     if (user && user.uid) {
       try {
@@ -284,9 +284,9 @@ export default function App() {
       setCustomers(data);
     });
 
-    migrateLocalDataToFirestoreIfEmpty(user.uid, inquiries, exchangeRates).then((result) => {
-      if (result.migrated && result.count > 0) {
-        showToast(`Migrated ${result.count} local inquiries to Cloud Firestore`, 'success');
+    migrateLocalDataToFirestoreIfEmpty(user.uid).then((migratedCount) => {
+      if (migratedCount > 0) {
+        showToast(\`Migrated \${migratedCount} local inquiries to Cloud Firestore\`, 'success');
       }
     }).catch(console.error);
 
@@ -316,21 +316,6 @@ export default function App() {
 
     return () => unsubscribe();
   }, []);
-
-  if (isLoadingAuth) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center font-sans">
-        <div className="flex items-center gap-3 text-indigo-600">
-          <RefreshCw className="w-6 h-6 animate-spin" />
-          <span className="font-semibold">Loading...</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user || needsAuth) {
-    return <AuthPage onLogin={handleLogin} isLoggingIn={isLoggingIn} loginError={loginError} />;
-  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
@@ -471,9 +456,9 @@ export default function App() {
       
       {/* Toast Notification */}
       {toastMessage && (
-        <div className={`fixed bottom-4 right-4 max-w-sm w-full shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black/5 p-4 ${
+        <div className={\`fixed bottom-4 right-4 max-w-sm w-full shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black/5 p-4 \${
           toastMessage.type === 'error' ? 'bg-rose-50 text-rose-800' : 'bg-white text-slate-800'
-        }`}>
+        }\`}>
           <div className="flex items-start gap-3">
             {toastMessage.type === 'success' ? (
               <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
@@ -491,3 +476,5 @@ export default function App() {
     </div>
   );
 }
+`
+fs.writeFileSync('src/App.tsx', appCode);

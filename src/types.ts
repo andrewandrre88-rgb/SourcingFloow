@@ -110,3 +110,19 @@ export interface SheetSyncState {
   isSheetConfigured: boolean;
 }
 
+
+
+export interface Customer {
+  id: string; // Unique ID
+  name: string; // Company or Contact Name
+  contactEmail?: string;
+  contactPhone?: string;
+  whatsapp?: string;
+  wechatId?: string;
+  country?: string;
+  type: 'Active' | 'Potential' | 'Past';
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
