@@ -124,7 +124,17 @@ export default function App() {
       await googleSignIn();
     } catch (error: any) {
       console.error('Login failed:', error);
-      setLoginError(error.message || 'Failed to sign in. Please try again.');
+      if (error?.code === 'auth/unauthorized-domain' || error?.message?.includes('unauthorized-domain')) {
+        setLoginError(
+          'Domain not authorized: Please add "sourcing-floow.vercel.app" to your Firebase Console under Authentication > Settings > Authorized domains.'
+        );
+      } else if (error?.code === 'auth/popup-blocked') {
+        setLoginError('The sign-in popup was blocked by your browser. Please allow popups for this site and try again.');
+      } else if (error?.code === 'auth/popup-closed-by-user') {
+        setLoginError('Sign-in cancelled. Click below to continue with Google.');
+      } else {
+        setLoginError(error?.message || 'Failed to sign in. Please try again.');
+      }
     } finally {
       setIsLoggingIn(false);
     }

@@ -1,5 +1,6 @@
 import React from 'react';
-import { PackageOpen, AlertCircle, ExternalLink } from 'lucide-react';
+import { PackageOpen, AlertCircle, ExternalLink, ShieldAlert } from 'lucide-react';
+import firebaseConfig from '../../firebase-applet-config.json';
 
 interface AuthPageProps {
   onLogin: () => void;
@@ -9,6 +10,13 @@ interface AuthPageProps {
 
 export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, isLoggingIn, loginError }) => {
   const isIframe = typeof window !== 'undefined' && window.self !== window.top;
+  const isUnauthorizedDomain = Boolean(
+    loginError &&
+      (loginError.toLowerCase().includes('authorized domain') ||
+        loginError.toLowerCase().includes('unauthorized-domain'))
+  );
+
+  const firebaseAuthSettingsUrl = `https://console.firebase.google.com/project/${firebaseConfig.projectId}/authentication/settings`;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-center items-center p-4">
@@ -27,16 +35,50 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, isLoggingIn, loginE
         
         <div className="p-8 flex flex-col items-center">
           {loginError && (
-            <div className="w-full mb-5 p-3.5 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-800 flex items-start gap-2.5">
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <p className="font-semibold">Sign in Notice</p>
-                <p className="text-rose-700 leading-relaxed">{loginError}</p>
-                {isIframe && (
-                  <p className="pt-1 text-slate-700">
-                    Tip: If your browser blocks popups in the preview window, open the app in a new tab to sign in.
-                  </p>
+            <div className={`w-full mb-5 p-4 rounded-xl text-xs border ${
+              isUnauthorizedDomain 
+                ? 'bg-amber-50 border-amber-300 text-amber-950' 
+                : 'bg-rose-50 border-rose-200 text-rose-800'
+            }`}>
+              <div className="flex items-start gap-2.5">
+                {isUnauthorizedDomain ? (
+                  <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                 )}
+                <div className="space-y-1.5 flex-1">
+                  <p className="font-semibold text-sm">
+                    {isUnauthorizedDomain ? 'Firebase Domain Authorization Needed' : 'Sign in Notice'}
+                  </p>
+                  <p className="leading-relaxed">
+                    {loginError}
+                  </p>
+                  {isUnauthorizedDomain && (
+                    <div className="mt-2 pt-2 border-t border-amber-200 space-y-1.5 text-amber-900">
+                      <p className="font-medium">Quick 1-Minute Fix in Firebase:</p>
+                      <ol className="list-decimal pl-4 space-y-1">
+                        <li>Open the Firebase Auth Settings link below.</li>
+                        <li>Scroll down to <strong>Authorized domains</strong>.</li>
+                        <li>Click <strong>Add domain</strong> and enter: <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-bold text-amber-950">sourcing-floow.vercel.app</code></li>
+                        <li>Click Save and then press <strong>Continue with Google</strong> below.</li>
+                      </ol>
+                      <a
+                        href={firebaseAuthSettingsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-md transition text-xs shadow-xs"
+                      >
+                        <span>Open Firebase Auth Settings</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
+                  )}
+                  {isIframe && !isUnauthorizedDomain && (
+                    <p className="pt-1 text-slate-700">
+                      Tip: If your browser blocks popups in the preview window, open the app in a new tab to sign in.
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           )}

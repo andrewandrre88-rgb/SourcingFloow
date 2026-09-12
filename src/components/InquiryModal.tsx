@@ -131,6 +131,10 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
   const [quoteCurrencies, setQuoteCurrencies] = useState<
     Record<string, { price: CurrencyUnit; shipping: CurrencyUnit }>
   >({});
+  const [quoteInputsRaw, setQuoteInputsRaw] = useState<
+    Record<string, { price?: string; shipping?: string }>
+  >({});
+  const [targetPriceRaw, setTargetPriceRaw] = useState<string | null>(null);
   const [marginMode, setMarginMode] = useState<'percent' | 'fixed_usd' | 'fixed_rmb'>('percent');
   const [fixedMarginRmb, setFixedMarginRmb] = useState<number>(0);
 
@@ -154,6 +158,8 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
 
   // Load existing data if editing, or initialize defaults for new inquiry
   useEffect(() => {
+    setQuoteInputsRaw({});
+    setTargetPriceRaw(null);
     if (inquiryToEdit) {
       // Migrate legacy single-quote to quotes array if missing
       const initialQuotes = inquiryToEdit.quotes?.length
@@ -256,8 +262,8 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
 
   // Recalculate prices based on SELECTED quote
   const selectedQuote = formData.quotes?.find((q) => q.id === formData.selectedQuoteId) || formData.quotes?.[0];
-  const activePrice1688 = selectedQuote?.price1688Rmb || 0;
-  const activeShipping = selectedQuote?.domesticShippingRmb || 0;
+  const activePrice1688 = !isNaN(Number(selectedQuote?.price1688Rmb)) ? Math.max(0, Number(selectedQuote?.price1688Rmb)) : 0;
+  const activeShipping = !isNaN(Number(selectedQuote?.domesticShippingRmb)) ? Math.max(0, Number(selectedQuote?.domesticShippingRmb)) : 0;
 
   const pricing = calculateInquiryPricing({
     quantity: Number(formData.quantity) || 1,
@@ -286,20 +292,37 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
   );
   const netAgentProfit = Number((pricing.estimatedProfitUsd - totalHelperCommission).toFixed(2));
 
+  // Helper to sanitize numeric inputs entered with symbols like $, ¥, €, commas, or spaces
+  const cleanCurrencyInput = (raw: string): string => {
+    if (!raw) return '';
+    let cleaned = raw.replace(/[$¥€£\s]/g, '').replace(',', '.');
+    cleaned = cleaned.replace(/[^0-9.]/g, '');
+    const parts = cleaned.split('.');
+    if (parts.length > 2) {
+      cleaned = parts[0] + '.' + parts.slice(1).join('');
+    }
+    return cleaned;
+  };
+
   // Currency helper handlers
   const handleTargetPriceChange = (valStr: string, currency: CurrencyUnit) => {
-    if (valStr === '') {
+    const cleaned = cleanCurrencyInput(valStr);
+    setTargetPriceRaw(cleaned);
+    if (cleaned === '' || cleaned === '.') {
       setFormData((prev) => ({ ...prev, targetPriceUsd: undefined, targetPriceRmb: undefined }));
       return;
     }
-    const val = parseFloat(valStr);
-    if (isNaN(val)) { if (valStr === "." || valStr === "-") setFormData(p => ({...p, targetPriceUsd: valStr as any, targetPriceRmb: valStr as any})); return; }
+    const val = parseFloat(cleaned);
+    if (isNaN(val) || !isFinite(val)) {
+      return;
+    }
+    const rate = exchangeRates.USD_TO_RMB > 0 ? exchangeRates.USD_TO_RMB : 7.25;
     if (currency === 'USD') {
-      const rmb = Number((val * exchangeRates.USD_TO_RMB).toFixed(6));
-      setFormData((prev) => ({ ...prev, targetPriceUsd: valStr as any, targetPriceRmb: rmb }));
+      const rmb = Number((val * rate).toFixed(6));
+      setFormData((prev) => ({ ...prev, targetPriceUsd: val, targetPriceRmb: rmb }));
     } else {
-      const usd = Number((val / exchangeRates.USD_TO_RMB).toFixed(6));
-      setFormData((prev) => ({ ...prev, targetPriceRmb: valStr as any, targetPriceUsd: usd }));
+      const usd = Number((val / rate).toFixed(6));
+      setFormData((prev) => ({ ...prev, targetPriceRmb: val, targetPriceUsd: usd }));
     }
   };
 
@@ -312,6 +335,7 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
   };
 
   const setQuotePriceCurrency = (quoteId: string, curr: CurrencyUnit) => {
+    const quote = formData.quotes?.find((q) => q.id === quoteId);
     setQuoteCurrencies((prev) => ({
       ...prev,
       [quoteId]: {
@@ -319,9 +343,27 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
         shipping: prev[quoteId]?.shipping || activeCurrencyMode,
       },
     }));
+    if (quote) {
+      const rate = exchangeRates.USD_TO_RMB > 0 ? exchangeRates.USD_TO_RMB : 7.25;
+      const rmb = Number(quote.price1688Rmb) || 0;
+      if (curr === 'USD') {
+        const usdVal = rmb > 0 ? String(Math.round((rmb / rate) * 1000000) / 1000000) : '';
+        setQuoteInputsRaw((prev) => ({
+          ...prev,
+          [quoteId]: { ...prev[quoteId], price: usdVal },
+        }));
+      } else {
+        const rmbVal = rmb > 0 ? String(rmb) : '';
+        setQuoteInputsRaw((prev) => ({
+          ...prev,
+          [quoteId]: { ...prev[quoteId], price: rmbVal },
+        }));
+      }
+    }
   };
 
   const setQuoteShippingCurrency = (quoteId: string, curr: CurrencyUnit) => {
+    const quote = formData.quotes?.find((q) => q.id === quoteId);
     setQuoteCurrencies((prev) => ({
       ...prev,
       [quoteId]: {
@@ -329,44 +371,110 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
         shipping: curr,
       },
     }));
+    if (quote) {
+      const rate = exchangeRates.USD_TO_RMB > 0 ? exchangeRates.USD_TO_RMB : 7.25;
+      const rmb = Number(quote.domesticShippingRmb) || 0;
+      if (curr === 'USD') {
+        const usdVal = rmb > 0 ? String(Math.round((rmb / rate) * 1000000) / 1000000) : '';
+        setQuoteInputsRaw((prev) => ({
+          ...prev,
+          [quoteId]: { ...prev[quoteId], shipping: usdVal },
+        }));
+      } else {
+        const rmbVal = rmb > 0 ? String(rmb) : '';
+        setQuoteInputsRaw((prev) => ({
+          ...prev,
+          [quoteId]: { ...prev[quoteId], shipping: rmbVal },
+        }));
+      }
+    }
   };
 
   const switchAllQuoteCurrencies = (curr: CurrencyUnit) => {
     setActiveCurrencyMode(curr);
     const updated: Record<string, { price: CurrencyUnit; shipping: CurrencyUnit }> = {};
+    const rate = exchangeRates.USD_TO_RMB > 0 ? exchangeRates.USD_TO_RMB : 7.25;
+    const rawUpdated: Record<string, { price?: string; shipping?: string }> = {};
+
     formData.quotes?.forEach((q) => {
       updated[q.id] = { price: curr, shipping: curr };
+      const pRmb = Number(q.price1688Rmb) || 0;
+      const sRmb = Number(q.domesticShippingRmb) || 0;
+      if (curr === 'USD') {
+        rawUpdated[q.id] = {
+          price: pRmb > 0 ? String(Math.round((pRmb / rate) * 1000000) / 1000000) : '',
+          shipping: sRmb > 0 ? String(Math.round((sRmb / rate) * 1000000) / 1000000) : '',
+        };
+      } else {
+        rawUpdated[q.id] = {
+          price: pRmb > 0 ? String(pRmb) : '',
+          shipping: sRmb > 0 ? String(sRmb) : '',
+        };
+      }
     });
     setQuoteCurrencies(updated);
+    setQuoteInputsRaw((prev) => ({ ...prev, ...rawUpdated }));
   };
 
   const handleQuotePriceChange = (quoteIndex: number, valStr: string, currency: CurrencyUnit) => {
+    const cleaned = cleanCurrencyInput(valStr);
     const newQuotes = [...(formData.quotes || [])];
-    if (!newQuotes[quoteIndex]) return;
+    const q = newQuotes[quoteIndex];
+    if (!q) return;
 
-    if (valStr === '') {
-      newQuotes[quoteIndex].price1688Rmb = '' as any;
+    setQuoteInputsRaw((prev) => ({
+      ...prev,
+      [q.id]: {
+        ...prev[q.id],
+        price: cleaned,
+      },
+    }));
+
+    if (cleaned === '' || cleaned === '.') {
+      q.price1688Rmb = 0;
     } else {
-      if (currency === 'USD') {
-        newQuotes[quoteIndex].price1688Rmb = Number((Number(valStr) * exchangeRates.USD_TO_RMB).toFixed(6)) as any;
+      const parsed = parseFloat(cleaned);
+      if (!isNaN(parsed) && isFinite(parsed)) {
+        const rate = exchangeRates.USD_TO_RMB > 0 ? exchangeRates.USD_TO_RMB : 7.25;
+        if (currency === 'USD') {
+          q.price1688Rmb = Math.round(parsed * rate * 1000000) / 1000000;
+        } else {
+          q.price1688Rmb = parsed;
+        }
       } else {
-        newQuotes[quoteIndex].price1688Rmb = valStr as any;
+        q.price1688Rmb = 0;
       }
     }
     setFormData((prev) => ({ ...prev, quotes: newQuotes }));
   };
 
   const handleQuoteShippingChange = (quoteIndex: number, valStr: string, currency: CurrencyUnit) => {
+    const cleaned = cleanCurrencyInput(valStr);
     const newQuotes = [...(formData.quotes || [])];
-    if (!newQuotes[quoteIndex]) return;
+    const q = newQuotes[quoteIndex];
+    if (!q) return;
 
-    if (valStr === '') {
-      newQuotes[quoteIndex].domesticShippingRmb = '' as any;
+    setQuoteInputsRaw((prev) => ({
+      ...prev,
+      [q.id]: {
+        ...prev[q.id],
+        shipping: cleaned,
+      },
+    }));
+
+    if (cleaned === '' || cleaned === '.') {
+      q.domesticShippingRmb = 0;
     } else {
-      if (currency === 'USD') {
-        newQuotes[quoteIndex].domesticShippingRmb = Number((Number(valStr) * exchangeRates.USD_TO_RMB).toFixed(6)) as any;
+      const parsed = parseFloat(cleaned);
+      if (!isNaN(parsed) && isFinite(parsed)) {
+        const rate = exchangeRates.USD_TO_RMB > 0 ? exchangeRates.USD_TO_RMB : 7.25;
+        if (currency === 'USD') {
+          q.domesticShippingRmb = Math.round(parsed * rate * 1000000) / 1000000;
+        } else {
+          q.domesticShippingRmb = parsed;
+        }
       } else {
-        newQuotes[quoteIndex].domesticShippingRmb = valStr as any;
+        q.domesticShippingRmb = 0;
       }
     }
     setFormData((prev) => ({ ...prev, quotes: newQuotes }));
@@ -486,15 +594,23 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
         formData.deliveryLeadTimeDays !== undefined && formData.deliveryLeadTimeDays !== null && String(formData.deliveryLeadTimeDays).trim() !== '' && !isNaN(Number(formData.deliveryLeadTimeDays))
           ? Number(formData.deliveryLeadTimeDays)
           : undefined,
-      price1688Rmb: activePrice1688,
-      domesticShippingRmb: activeShipping,
-      quotes: formData.quotes || [],
+      price1688Rmb: !isNaN(Number(activePrice1688)) ? Math.max(0, Number(activePrice1688)) : 0,
+      domesticShippingRmb: !isNaN(Number(activeShipping)) ? Math.max(0, Number(activeShipping)) : 0,
+      quotes: (formData.quotes || []).map((q) => ({
+        id: q.id || `quote_${Date.now()}`,
+        supplierName: q.supplierName || '',
+        productUrl1688: q.productUrl1688 || '',
+        price1688Rmb: !isNaN(Number(q.price1688Rmb)) ? Math.max(0, Number(q.price1688Rmb)) : 0,
+        domesticShippingRmb: !isNaN(Number(q.domesticShippingRmb)) ? Math.max(0, Number(q.domesticShippingRmb)) : 0,
+        wechatId: q.wechatId || '',
+        whatsapp: q.whatsapp || '',
+      })),
       selectedQuoteId: formData.selectedQuoteId || '',
-      marginPercent: Number(formData.marginPercent) || 0,
-      marginFixedUsd: Number(formData.marginFixedUsd) || 0,
-      clientUnitPriceUsd: pricing.clientUnitPriceUsd,
-      totalQuotationUsd: pricing.totalQuotationUsd,
-      estimatedProfitUsd: pricing.estimatedProfitUsd,
+      marginPercent: !isNaN(Number(formData.marginPercent)) ? Number(formData.marginPercent) : 0,
+      marginFixedUsd: !isNaN(Number(formData.marginFixedUsd)) ? Number(formData.marginFixedUsd) : 0,
+      clientUnitPriceUsd: !isNaN(Number(pricing.clientUnitPriceUsd)) ? pricing.clientUnitPriceUsd : 0,
+      totalQuotationUsd: !isNaN(Number(pricing.totalQuotationUsd)) ? pricing.totalQuotationUsd : 0,
+      estimatedProfitUsd: !isNaN(Number(pricing.estimatedProfitUsd)) ? pricing.estimatedProfitUsd : 0,
       helperCommissions: formData.helperCommissions || [],
       totalHelperCommissionUsd: totalHelperCommission,
       netAgentProfitUsd: netAgentProfit,
@@ -1039,10 +1155,20 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
                     <div className="inline-flex rounded bg-slate-200 p-0.5 text-[9px] font-bold">
                       <button
                         type="button"
-                        onClick={() => setTargetPriceCurrency('USD')}
+                        onClick={() => {
+                          setTargetPriceCurrency('USD');
+                          if (formData.targetPriceUsd !== undefined) {
+                            setTargetPriceRaw(String(formData.targetPriceUsd));
+                          } else if (formData.targetPriceRmb !== undefined) {
+                            const rate = exchangeRates.USD_TO_RMB > 0 ? exchangeRates.USD_TO_RMB : 7.25;
+                            setTargetPriceRaw(String(Number((formData.targetPriceRmb / rate).toFixed(6))));
+                          } else {
+                            setTargetPriceRaw('');
+                          }
+                        }}
                         className={`px-1.5 py-0.2 rounded transition ${
                           targetPriceCurrency === 'USD'
-                            ? 'bg-white text-indigo-600 shadow-2xs'
+                            ? 'bg-white text-indigo-600 shadow-2xs font-bold'
                             : 'text-slate-500 hover:text-slate-800'
                         }`}
                       >
@@ -1050,10 +1176,20 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => setTargetPriceCurrency('RMB')}
+                        onClick={() => {
+                          setTargetPriceCurrency('RMB');
+                          if (formData.targetPriceRmb !== undefined) {
+                            setTargetPriceRaw(String(formData.targetPriceRmb));
+                          } else if (formData.targetPriceUsd !== undefined) {
+                            const rate = exchangeRates.USD_TO_RMB > 0 ? exchangeRates.USD_TO_RMB : 7.25;
+                            setTargetPriceRaw(String(Number((formData.targetPriceUsd * rate).toFixed(6))));
+                          } else {
+                            setTargetPriceRaw('');
+                          }
+                        }}
                         className={`px-1.5 py-0.2 rounded transition ${
                           targetPriceCurrency === 'RMB'
-                            ? 'bg-white text-emerald-600 shadow-2xs'
+                            ? 'bg-white text-emerald-600 shadow-2xs font-bold'
                             : 'text-slate-500 hover:text-slate-800'
                         }`}
                       >
@@ -1067,12 +1203,14 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
                     </span>
                     <input
                       id="modal-target-price-input"
-                      type="number"
-                      min="0"
-                      step="any"
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
                       placeholder={targetPriceCurrency === 'USD' ? 'e.g. 0.0495' : 'e.g. 0.358'}
                       value={
-                        targetPriceCurrency === 'USD'
+                        targetPriceRaw !== null
+                          ? targetPriceRaw
+                          : targetPriceCurrency === 'USD'
                           ? formData.targetPriceUsd ?? ''
                           : formData.targetPriceRmb ?? ''
                       }
@@ -1545,9 +1683,18 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
                       <div>
                         {(() => {
                           const pCurr = getQuotePriceCurrency(quote.id);
-                          const usdEquivalent = quote.price1688Rmb / exchangeRates.USD_TO_RMB;
-                          const rmbDisplay = quote.price1688Rmb > 0 ? quote.price1688Rmb : '';
-                          const usdDisplay = quote.price1688Rmb > 0 ? Number(usdEquivalent.toFixed(6)) : '';
+                          const rate = exchangeRates.USD_TO_RMB > 0 ? exchangeRates.USD_TO_RMB : 7.25;
+                          const pRmb = Number(quote.price1688Rmb) || 0;
+                          const usdEquivalent = pRmb / rate;
+                          const rawPrice = quoteInputsRaw[quote.id]?.price;
+                          let displayPrice: string;
+                          if (rawPrice !== undefined) {
+                            displayPrice = rawPrice;
+                          } else if (pCurr === 'USD') {
+                            displayPrice = pRmb > 0 ? String(Math.round(usdEquivalent * 1000000) / 1000000) : '';
+                          } else {
+                            displayPrice = pRmb > 0 ? String(pRmb) : '';
+                          }
 
                           return (
                             <div>
@@ -1588,27 +1735,27 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
                                 </span>
                                 <input
                                   id={`quote-price-input-${idx}`}
-                                  type="number"
-                                  min="0"
-                                  step="any"
-                                  placeholder="0.0000"
-                                  value={pCurr === 'RMB' ? rmbDisplay : usdDisplay}
+                                  type="text"
+                                  inputMode="decimal"
+                                  autoComplete="off"
+                                  placeholder={pCurr === 'USD' ? '0.0490' : '0.3500'}
+                                  value={displayPrice}
                                   onChange={(e) => handleQuotePriceChange(idx, e.target.value, pCurr)}
                                   className="w-full pl-5 pr-2 py-1 bg-white border border-slate-300 rounded text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-indigo-500"
                                 />
                               </div>
                               <div className="text-[9px] font-mono mt-0.5 text-slate-500">
                                 {pCurr === 'RMB' ? (
-                                  quote.price1688Rmb > 0 ? (
+                                  pRmb > 0 ? (
                                     <span className="text-emerald-700 font-semibold">
                                       ≈ {formatUnitPrice(usdEquivalent, 'USD')}
                                     </span>
                                   ) : (
                                     <span>Enter in ¥ RMB</span>
                                   )
-                                ) : quote.price1688Rmb > 0 ? (
+                                ) : pRmb > 0 ? (
                                   <span className="text-emerald-700 font-semibold">
-                                    ≈ {formatUnitPrice(quote.price1688Rmb, 'RMB')}
+                                    ≈ {formatUnitPrice(pRmb, 'RMB')}
                                   </span>
                                 ) : (
                                   <span>Enter in $ USD</span>
@@ -1622,10 +1769,18 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
                       <div>
                         {(() => {
                           const sCurr = getQuoteShippingCurrency(quote.id);
-                          const shippingRmb = quote.domesticShippingRmb || 0;
-                          const usdEquivalent = shippingRmb / exchangeRates.USD_TO_RMB;
-                          const rmbDisplay = shippingRmb > 0 ? shippingRmb : '';
-                          const usdDisplay = shippingRmb > 0 ? Number(usdEquivalent.toFixed(6)) : '';
+                          const rate = exchangeRates.USD_TO_RMB > 0 ? exchangeRates.USD_TO_RMB : 7.25;
+                          const sRmb = Number(quote.domesticShippingRmb) || 0;
+                          const usdEquivalent = sRmb / rate;
+                          const rawShipping = quoteInputsRaw[quote.id]?.shipping;
+                          let displayShipping: string;
+                          if (rawShipping !== undefined) {
+                            displayShipping = rawShipping;
+                          } else if (sCurr === 'USD') {
+                            displayShipping = sRmb > 0 ? String(Math.round(usdEquivalent * 1000000) / 1000000) : '';
+                          } else {
+                            displayShipping = sRmb > 0 ? String(sRmb) : '';
+                          }
 
                           return (
                             <div>
@@ -1666,24 +1821,24 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
                                 </span>
                                 <input
                                   id={`quote-shipping-input-${idx}`}
-                                  type="number"
-                                  min="0"
-                                  step="any"
+                                  type="text"
+                                  inputMode="decimal"
+                                  autoComplete="off"
                                   placeholder="0.00"
-                                  value={sCurr === 'RMB' ? rmbDisplay : usdDisplay}
+                                  value={displayShipping}
                                   onChange={(e) => handleQuoteShippingChange(idx, e.target.value, sCurr)}
                                   className="w-full pl-5 pr-2 py-1 bg-white border border-slate-300 rounded text-xs font-mono text-slate-900 focus:outline-none focus:border-indigo-500"
                                 />
                               </div>
                               <div className="text-[9px] font-mono mt-0.5 text-slate-500">
                                 {sCurr === 'RMB' ? (
-                                  shippingRmb > 0 ? (
+                                  sRmb > 0 ? (
                                     <span>≈ {formatUnitPrice(usdEquivalent, 'USD')}</span>
                                   ) : (
                                     <span>Enter in ¥ RMB</span>
                                   )
-                                ) : shippingRmb > 0 ? (
-                                  <span>≈ {formatUnitPrice(shippingRmb, 'RMB')}</span>
+                                ) : sRmb > 0 ? (
+                                  <span>≈ {formatUnitPrice(sRmb, 'RMB')}</span>
                                 ) : (
                                   <span>Enter in $ USD</span>
                                 )}
@@ -1695,6 +1850,7 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
                       <div>
                         <label className="block text-[10px] font-medium text-slate-500 mb-1">WeChat ID</label>
                         <input
+                          id={`quote-wechat-input-${idx}`}
                           type="text"
                           placeholder="e.g. wx_supplier123"
                           value={quote.wechatId || ''}
@@ -1709,6 +1865,7 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
                       <div>
                         <label className="block text-[10px] font-medium text-slate-500 mb-1">WhatsApp</label>
                         <input
+                          id={`quote-whatsapp-input-${idx}`}
                           type="text"
                           placeholder="e.g. +86..."
                           value={quote.whatsapp || ''}
@@ -1831,20 +1988,21 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
                   <div className="relative">
                     <input
                       id="modal-margin-percent-input"
-                      type="number"
-                      min="0"
-                      max="10000"
-                      step="any"
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
                       placeholder="e.g. 20 or 2.5"
                       required
                       value={formData.marginPercent ?? ''}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const cleaned = cleanCurrencyInput(e.target.value);
+                        const val = parseFloat(cleaned);
                         setFormData({
                           ...formData,
-                          marginPercent: e.target.value as any,
+                          marginPercent: !isNaN(val) ? val : (cleaned === '' ? ('' as any) : 0),
                           marginFixedUsd: 0,
-                        })
-                      }
+                        });
+                      }}
                       className="w-full pr-6 pl-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs text-green-700 font-bold focus:outline-none focus:border-indigo-500 shadow-xs"
                     />
                     <span className="absolute right-2.5 top-1.5 text-slate-400 text-xs">%</span>
@@ -1856,18 +2014,20 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
                     <span className="absolute left-2.5 top-1.5 text-slate-400 text-xs font-bold">$</span>
                     <input
                       id="modal-margin-usd-input"
-                      type="number"
-                      min="0"
-                      step="any"
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
                       placeholder="e.g. 0.005 or 1.50"
-                      value={formData.marginFixedUsd || ''}
-                      onChange={(e) =>
+                      value={formData.marginFixedUsd ?? ''}
+                      onChange={(e) => {
+                        const cleaned = cleanCurrencyInput(e.target.value);
+                        const val = parseFloat(cleaned);
                         setFormData({
                           ...formData,
-                          marginFixedUsd: e.target.value as any,
+                          marginFixedUsd: !isNaN(val) ? val : (cleaned === '' ? ('' as any) : 0),
                           marginPercent: 0,
-                        })
-                      }
+                        });
+                      }}
                       className="w-full pl-6 pr-14 py-1.5 bg-white border border-slate-300 rounded text-xs text-indigo-700 font-bold focus:outline-none focus:border-indigo-500 shadow-xs"
                     />
                     <span className="absolute right-2 top-1.5 text-[10px] text-slate-400 font-mono">
@@ -1881,17 +2041,19 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
                     <span className="absolute left-2.5 top-1.5 text-slate-400 text-xs font-bold">¥</span>
                     <input
                       id="modal-margin-rmb-input"
-                      type="number"
-                      min="0"
-                      step="any"
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
                       placeholder="e.g. 0.05 or 10"
                       value={fixedMarginRmb || (formData.marginFixedUsd ? (formData.marginFixedUsd * exchangeRates.USD_TO_RMB).toFixed(4) : '')}
                       onChange={(e) => {
-                        const rmbVal = e.target.value as any;
-                        setFixedMarginRmb(rmbVal);
+                        const cleaned = cleanCurrencyInput(e.target.value);
+                        const parsed = parseFloat(cleaned);
+                        setFixedMarginRmb(!isNaN(parsed) ? parsed : (cleaned === '' ? ('' as any) : 0));
+                        const rate = exchangeRates.USD_TO_RMB > 0 ? exchangeRates.USD_TO_RMB : 7.25;
                         setFormData({
                           ...formData,
-                          marginFixedUsd: rmbVal / exchangeRates.USD_TO_RMB,
+                          marginFixedUsd: !isNaN(parsed) ? parsed / rate : 0,
                           marginPercent: 0,
                         });
                       }}

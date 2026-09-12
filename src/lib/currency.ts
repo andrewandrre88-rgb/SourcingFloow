@@ -53,12 +53,12 @@ export function calculateInquiryPricing(params: {
   estimatedProfitUsd: number;
   estimatedProfitRmb: number;
 } {
-  const qty = Math.max(1, Number(params.quantity) || 1);
-  const p1688 = Math.max(0, Number(params.price1688Rmb) || 0);
-  const domShip = Math.max(0, Number(params.domesticShippingRmb) || 0);
-  const rate = params.usdToRmbRate > 0 ? params.usdToRmbRate : 7.25;
-  const marginPct = Number(params.marginPercent) || 0;
-  const marginFixed = Number(params.marginFixedUsd) || 0;
+  const qty = Math.max(1, !isNaN(Number(params.quantity)) && isFinite(Number(params.quantity)) ? Number(params.quantity) : 1);
+  const p1688 = Math.max(0, !isNaN(Number(params.price1688Rmb)) && isFinite(Number(params.price1688Rmb)) ? Number(params.price1688Rmb) : 0);
+  const domShip = Math.max(0, !isNaN(Number(params.domesticShippingRmb)) && isFinite(Number(params.domesticShippingRmb)) ? Number(params.domesticShippingRmb) : 0);
+  const rate = params.usdToRmbRate > 0 && !isNaN(params.usdToRmbRate) ? params.usdToRmbRate : 7.25;
+  const marginPct = !isNaN(Number(params.marginPercent)) ? Number(params.marginPercent) : 0;
+  const marginFixed = !isNaN(Number(params.marginFixedUsd)) ? Number(params.marginFixedUsd) : 0;
 
   // Total sourcing cost in RMB per unit (product price + allocated domestic shipping)
   const unitCostRmb = p1688 + domShip / qty;
@@ -115,7 +115,7 @@ export function formatUnitPrice(
     GBP: '£',
   };
   const symbol = symbols[currency] || '$';
-  const num = Number(amount) || 0;
+  const num = !isNaN(Number(amount)) && isFinite(Number(amount)) ? Number(amount) : 0;
 
   if (explicitDecimals !== undefined) {
     return `${symbol}${num.toLocaleString('en-US', {

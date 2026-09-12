@@ -1,12 +1,14 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
   getAuth,
-  signInWithPopup, browserPopupRedirectResolver,
+  signInWithPopup,
+  browserPopupRedirectResolver,
   GoogleAuthProvider,
   onAuthStateChanged,
   signOut,
   User,
   setPersistence,
+  browserLocalPersistence,
   inMemoryPersistence,
 } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
@@ -15,10 +17,10 @@ import firebaseConfig from '../../firebase-applet-config.json';
 export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 
-// Configure local persistence
+// Configure local persistence (local storage preferred so user stays signed in on custom domain)
 try {
-  setPersistence(auth, inMemoryPersistence).catch((err) => {
-    console.warn('Firebase setPersistence warning:', err);
+  setPersistence(auth, browserLocalPersistence).catch(() => {
+    setPersistence(auth, inMemoryPersistence).catch(() => {});
   });
 } catch (e) {
   console.warn('Failed to set persistence:', e);

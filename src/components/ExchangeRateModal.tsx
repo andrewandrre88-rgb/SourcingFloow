@@ -21,6 +21,12 @@ export const ExchangeRateModal: React.FC<ExchangeRateModalProps> = ({
 
   if (!isOpen) return null;
 
+  const sanitizeRate = (valStr: string): number => {
+    const cleaned = valStr.replace(/[$¥€£\s]/g, '').replace(',', '.').replace(/[^0-9.]/g, '');
+    const num = parseFloat(cleaned);
+    return !isNaN(num) && isFinite(num) && num > 0 ? num : 0;
+  };
+
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     onSaveRates({
@@ -61,12 +67,12 @@ export const ExchangeRateModal: React.FC<ExchangeRateModalProps> = ({
               <span className="absolute left-2.5 top-1.5 text-xs text-slate-400">¥</span>
               <input
                 id="rate-usd-input"
-                type="number"
-                step="any"
-                min="0.0001"
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
                 required
                 value={usdRate}
-                onChange={(e) => setUsdRate(e.target.value as any)}
+                onChange={(e) => setUsdRate(sanitizeRate(e.target.value))}
                 className="w-full pl-6 pr-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs text-slate-900 font-mono font-bold focus:outline-none focus:border-indigo-500 shadow-xs"
               />
             </div>
@@ -81,11 +87,11 @@ export const ExchangeRateModal: React.FC<ExchangeRateModalProps> = ({
               <span className="absolute left-2.5 top-1.5 text-xs text-slate-400">¥</span>
               <input
                 id="rate-eur-input"
-                type="number"
-                step="any"
-                min="0.0001"
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
                 value={eurRate}
-                onChange={(e) => setEurRate(e.target.value as any)}
+                onChange={(e) => setEurRate(sanitizeRate(e.target.value))}
                 className="w-full pl-6 pr-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs text-slate-900 font-mono focus:outline-none focus:border-indigo-500 shadow-xs"
               />
             </div>
@@ -99,11 +105,11 @@ export const ExchangeRateModal: React.FC<ExchangeRateModalProps> = ({
               <span className="absolute left-2.5 top-1.5 text-xs text-slate-400">¥</span>
               <input
                 id="rate-gbp-input"
-                type="number"
-                step="any"
-                min="0.0001"
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
                 value={gbpRate}
-                onChange={(e) => setGbpRate(e.target.value as any)}
+                onChange={(e) => setGbpRate(sanitizeRate(e.target.value))}
                 className="w-full pl-6 pr-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs text-slate-900 font-mono focus:outline-none focus:border-indigo-500 shadow-xs"
               />
             </div>

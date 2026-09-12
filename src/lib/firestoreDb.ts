@@ -212,6 +212,11 @@ export async function saveInquiryToFirestore(
   const path = `users/${uid}/inquiries/${inqId}`;
   const inquiryRef = doc(db, 'users', uid, 'inquiries', inqId);
 
+  const safeNum = (val: any, fallback = 0): number => {
+    const n = Number(val);
+    return isNaN(n) || !isFinite(n) ? fallback : n;
+  };
+
   // Clean data payload, omitting undefined values for Firestore compatibility
   const cleanPayload: Record<string, any> = {
     id: inqId,
@@ -221,12 +226,12 @@ export async function saveInquiryToFirestore(
     customerName: inquiry.customerName,
     country: inquiry.country || 'Global',
     product: inquiry.product,
-    quantity: Number(inquiry.quantity || 1),
-    price1688Rmb: Number(inquiry.price1688Rmb || 0),
-    marginPercent: Number(inquiry.marginPercent || 0),
-    clientUnitPriceUsd: Number(inquiry.clientUnitPriceUsd || 0),
-    totalQuotationUsd: Number(inquiry.totalQuotationUsd || 0),
-    estimatedProfitUsd: Number(inquiry.estimatedProfitUsd || 0),
+    quantity: Math.max(1, safeNum(inquiry.quantity, 1)),
+    price1688Rmb: safeNum(inquiry.price1688Rmb, 0),
+    marginPercent: safeNum(inquiry.marginPercent, 0),
+    clientUnitPriceUsd: safeNum(inquiry.clientUnitPriceUsd, 0),
+    totalQuotationUsd: safeNum(inquiry.totalQuotationUsd, 0),
+    estimatedProfitUsd: safeNum(inquiry.estimatedProfitUsd, 0),
     orderStatus: inquiry.orderStatus,
     updatedAt: inquiry.updatedAt || new Date().toISOString(),
     firestoreServerTime: serverTimestamp(),
@@ -235,41 +240,41 @@ export async function saveInquiryToFirestore(
   if (inquiry.customerContact) cleanPayload.customerContact = inquiry.customerContact;
   if (inquiry.wechatId) cleanPayload.wechatId = inquiry.wechatId;
   if (inquiry.quantityUnit) cleanPayload.quantityUnit = inquiry.quantityUnit;
-  if (inquiry.targetPriceUsd !== undefined && inquiry.targetPriceUsd !== null) cleanPayload.targetPriceUsd = Number(inquiry.targetPriceUsd);
-  if (inquiry.targetPriceRmb !== undefined && inquiry.targetPriceRmb !== null) cleanPayload.targetPriceRmb = Number(inquiry.targetPriceRmb);
-  if (inquiry.moq !== undefined && inquiry.moq !== null) cleanPayload.moq = Number(inquiry.moq);
-  if (inquiry.sampleQuantity !== undefined && inquiry.sampleQuantity !== null) cleanPayload.sampleQuantity = Number(inquiry.sampleQuantity);
-  if (inquiry.quantityTolerancePercent !== undefined && inquiry.quantityTolerancePercent !== null) cleanPayload.quantityTolerancePercent = Number(inquiry.quantityTolerancePercent);
-  if (inquiry.annualEstimatedQuantity !== undefined && inquiry.annualEstimatedQuantity !== null) cleanPayload.annualEstimatedQuantity = Number(inquiry.annualEstimatedQuantity);
-  if (inquiry.deliveryLeadTimeDays !== undefined && inquiry.deliveryLeadTimeDays !== null) cleanPayload.deliveryLeadTimeDays = Number(inquiry.deliveryLeadTimeDays);
+  if (inquiry.targetPriceUsd !== undefined && inquiry.targetPriceUsd !== null) cleanPayload.targetPriceUsd = safeNum(inquiry.targetPriceUsd);
+  if (inquiry.targetPriceRmb !== undefined && inquiry.targetPriceRmb !== null) cleanPayload.targetPriceRmb = safeNum(inquiry.targetPriceRmb);
+  if (inquiry.moq !== undefined && inquiry.moq !== null) cleanPayload.moq = safeNum(inquiry.moq);
+  if (inquiry.sampleQuantity !== undefined && inquiry.sampleQuantity !== null) cleanPayload.sampleQuantity = safeNum(inquiry.sampleQuantity);
+  if (inquiry.quantityTolerancePercent !== undefined && inquiry.quantityTolerancePercent !== null) cleanPayload.quantityTolerancePercent = safeNum(inquiry.quantityTolerancePercent);
+  if (inquiry.annualEstimatedQuantity !== undefined && inquiry.annualEstimatedQuantity !== null) cleanPayload.annualEstimatedQuantity = safeNum(inquiry.annualEstimatedQuantity);
+  if (inquiry.deliveryLeadTimeDays !== undefined && inquiry.deliveryLeadTimeDays !== null) cleanPayload.deliveryLeadTimeDays = safeNum(inquiry.deliveryLeadTimeDays);
   if (inquiry.imageUrl) cleanPayload.imageUrl = inquiry.imageUrl;
   if (inquiry.material) cleanPayload.material = inquiry.material;
   if (inquiry.colorVariant) cleanPayload.colorVariant = inquiry.colorVariant;
   if (inquiry.packagingType) cleanPayload.packagingType = inquiry.packagingType;
   if (inquiry.hsCode) cleanPayload.hsCode = inquiry.hsCode;
-  if (inquiry.boxLengthCm !== undefined && inquiry.boxLengthCm !== null) cleanPayload.boxLengthCm = Number(inquiry.boxLengthCm);
-  if (inquiry.boxWidthCm !== undefined && inquiry.boxWidthCm !== null) cleanPayload.boxWidthCm = Number(inquiry.boxWidthCm);
-  if (inquiry.boxHeightCm !== undefined && inquiry.boxHeightCm !== null) cleanPayload.boxHeightCm = Number(inquiry.boxHeightCm);
-  if (inquiry.pcsPerBox !== undefined && inquiry.pcsPerBox !== null) cleanPayload.pcsPerBox = Number(inquiry.pcsPerBox);
-  if (inquiry.unitWeightG !== undefined && inquiry.unitWeightG !== null) cleanPayload.unitWeightG = Number(inquiry.unitWeightG);
-  if (inquiry.grossWeightKg !== undefined && inquiry.grossWeightKg !== null) cleanPayload.grossWeightKg = Number(inquiry.grossWeightKg);
-  if (inquiry.netWeightKg !== undefined && inquiry.netWeightKg !== null) cleanPayload.netWeightKg = Number(inquiry.netWeightKg);
+  if (inquiry.boxLengthCm !== undefined && inquiry.boxLengthCm !== null) cleanPayload.boxLengthCm = safeNum(inquiry.boxLengthCm);
+  if (inquiry.boxWidthCm !== undefined && inquiry.boxWidthCm !== null) cleanPayload.boxWidthCm = safeNum(inquiry.boxWidthCm);
+  if (inquiry.boxHeightCm !== undefined && inquiry.boxHeightCm !== null) cleanPayload.boxHeightCm = safeNum(inquiry.boxHeightCm);
+  if (inquiry.pcsPerBox !== undefined && inquiry.pcsPerBox !== null) cleanPayload.pcsPerBox = safeNum(inquiry.pcsPerBox);
+  if (inquiry.unitWeightG !== undefined && inquiry.unitWeightG !== null) cleanPayload.unitWeightG = safeNum(inquiry.unitWeightG);
+  if (inquiry.grossWeightKg !== undefined && inquiry.grossWeightKg !== null) cleanPayload.grossWeightKg = safeNum(inquiry.grossWeightKg);
+  if (inquiry.netWeightKg !== undefined && inquiry.netWeightKg !== null) cleanPayload.netWeightKg = safeNum(inquiry.netWeightKg);
   if (inquiry.productUrl1688) cleanPayload.productUrl1688 = inquiry.productUrl1688;
   if (inquiry.supplierName) cleanPayload.supplierName = inquiry.supplierName;
-  if (inquiry.domesticShippingRmb !== undefined && inquiry.domesticShippingRmb !== null) cleanPayload.domesticShippingRmb = Number(inquiry.domesticShippingRmb);
-  if (inquiry.marginFixedUsd !== undefined && inquiry.marginFixedUsd !== null) cleanPayload.marginFixedUsd = Number(inquiry.marginFixedUsd);
+  if (inquiry.domesticShippingRmb !== undefined && inquiry.domesticShippingRmb !== null) cleanPayload.domesticShippingRmb = safeNum(inquiry.domesticShippingRmb);
+  if (inquiry.marginFixedUsd !== undefined && inquiry.marginFixedUsd !== null) cleanPayload.marginFixedUsd = safeNum(inquiry.marginFixedUsd);
   if (inquiry.selectedQuoteId) cleanPayload.selectedQuoteId = inquiry.selectedQuoteId;
   if (inquiry.notes) cleanPayload.notes = inquiry.notes;
   if (Array.isArray(inquiry.helperCommissions)) cleanPayload.helperCommissions = inquiry.helperCommissions;
-  if (inquiry.totalHelperCommissionUsd !== undefined && inquiry.totalHelperCommissionUsd !== null) cleanPayload.totalHelperCommissionUsd = Number(inquiry.totalHelperCommissionUsd);
-  if (inquiry.netAgentProfitUsd !== undefined && inquiry.netAgentProfitUsd !== null) cleanPayload.netAgentProfitUsd = Number(inquiry.netAgentProfitUsd);
+  if (inquiry.totalHelperCommissionUsd !== undefined && inquiry.totalHelperCommissionUsd !== null) cleanPayload.totalHelperCommissionUsd = safeNum(inquiry.totalHelperCommissionUsd);
+  if (inquiry.netAgentProfitUsd !== undefined && inquiry.netAgentProfitUsd !== null) cleanPayload.netAgentProfitUsd = safeNum(inquiry.netAgentProfitUsd);
   if (Array.isArray(inquiry.quotes) && inquiry.quotes.length > 0) {
     cleanPayload.quotes = inquiry.quotes.map((q) => ({
       id: q.id || '',
       supplierName: q.supplierName || '',
       productUrl1688: q.productUrl1688 || '',
-      price1688Rmb: Number(q.price1688Rmb || 0),
-      domesticShippingRmb: Number(q.domesticShippingRmb || 0),
+      price1688Rmb: safeNum(q.price1688Rmb, 0),
+      domesticShippingRmb: safeNum(q.domesticShippingRmb, 0),
       wechatId: q.wechatId || '',
       whatsapp: q.whatsapp || '',
     }));
