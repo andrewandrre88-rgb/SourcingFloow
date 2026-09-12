@@ -139,31 +139,31 @@ export const InquiryTable: React.FC<InquiryTableProps> = ({
   return (
     <div className="bg-white border border-slate-200 rounded-lg shadow-xs overflow-hidden">
       {/* Search & Filter Header */}
-      <div className="px-4 py-2.5 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between">
+      <div className="px-4 sm:px-6 py-3 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
         {/* Search input */}
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-slate-400" />
+        <div className="relative flex-1 max-w-sm sm:max-w-md lg:max-w-lg xl:max-w-xl">
+          <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400" />
           <input
             id="inquiry-search-input"
             type="text"
-            placeholder="Search inquiries, clients, products..."
+            placeholder="Search inquiries, clients, products, suppliers..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-8 pr-3 py-1 bg-white border border-slate-300 rounded text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition shadow-xs"
+            className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-300 rounded text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition shadow-xs"
           />
         </div>
 
         {/* Status Filter Tabs */}
         <div className="flex items-center space-x-2 overflow-x-auto pb-1 sm:pb-0">
-          <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
-            <SlidersHorizontal className="w-3 h-3 text-slate-400" />
+          <span className="text-xs font-medium text-slate-500 flex items-center gap-1 whitespace-nowrap">
+            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400" />
             <span>Filter:</span>
           </span>
           <select
             id="inquiry-status-filter-select"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-white border border-slate-300 text-xs text-slate-700 rounded px-2.5 py-1 focus:outline-none focus:border-indigo-500 cursor-pointer shadow-xs font-medium"
+            className="bg-white border border-slate-300 text-xs text-slate-700 rounded px-3 py-1.5 focus:outline-none focus:border-indigo-500 cursor-pointer shadow-xs font-medium"
           >
             <option value="All">All Inquiries ({inquiries.length})</option>
             {ALL_STATUSES.map((st) => (
