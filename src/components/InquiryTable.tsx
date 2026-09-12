@@ -39,6 +39,7 @@ interface InquiryTableProps {
   onDeleteRequest: (item: InquiryItem) => void;
   onStatusChange: (item: InquiryItem, newStatus: OrderStatus) => void;
   onQuickShare: (item: InquiryItem) => void;
+  onDuplicate: (item: InquiryItem) => void;
 }
 
 const ALL_STATUSES: OrderStatus[] = [
@@ -64,6 +65,7 @@ export const InquiryTable: React.FC<InquiryTableProps> = ({
   onDeleteRequest,
   onStatusChange,
   onQuickShare,
+  onDuplicate,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
@@ -556,6 +558,16 @@ export const InquiryTable: React.FC<InquiryTableProps> = ({
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
 
+                        {/* Duplicate Inquiry */}
+                        <button
+                          id={`inquiry-duplicate-btn-${item.id}`}
+                          onClick={() => onDuplicate(item)}
+                          title="Duplicate this Inquiry (Clone specs with new INQ #)"
+                          className="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-100 rounded transition"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+
                         {/* Delete with Confirmation */}
                         <button
                           id={`inquiry-delete-btn-${item.id}`}
@@ -739,6 +751,14 @@ export const InquiryTable: React.FC<InquiryTableProps> = ({
                     className="p-2 text-slate-600 hover:text-blue-600 hover:bg-slate-100 rounded border border-slate-200 transition flex items-center gap-1 text-xs font-medium"
                   >
                     <Edit2 className="w-4 h-4" /> Edit
+                  </button>
+                  <button
+                    id={`mobile-inquiry-duplicate-btn-${item.id}`}
+                    onClick={() => onDuplicate(item)}
+                    title="Duplicate inquiry"
+                    className="p-2 text-slate-600 hover:text-amber-600 hover:bg-slate-100 rounded border border-slate-200 transition flex items-center gap-1 text-xs font-medium"
+                  >
+                    <Copy className="w-4 h-4" /> Duplicate
                   </button>
                   <button
                     id={`mobile-inquiry-delete-btn-${item.id}`}

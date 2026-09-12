@@ -9,13 +9,22 @@ import {
 
 interface QuoteExportModalProps {
   isOpen: boolean;
-  item: InquiryItem | null;
+  item?: InquiryItem | null;
+  inquiry?: InquiryItem | null;
+  usdToRmbRate?: number;
   onClose: () => void;
 }
 
-export const QuoteExportModal: React.FC<QuoteExportModalProps> = ({ isOpen, item, onClose }) => {
+export const QuoteExportModal: React.FC<QuoteExportModalProps> = ({
+  isOpen,
+  item: propItem,
+  inquiry: propInquiry,
+  usdToRmbRate,
+  onClose,
+}) => {
   const [copied, setCopied] = useState(false);
 
+  const item = propItem || propInquiry;
   if (!isOpen || !item) return null;
 
   const packaging = calculatePackagingDetails({

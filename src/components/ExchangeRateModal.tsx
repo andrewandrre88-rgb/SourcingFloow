@@ -6,7 +6,8 @@ interface ExchangeRateModalProps {
   isOpen: boolean;
   onClose: () => void;
   rates: ExchangeRates;
-  onSaveRates: (newRates: ExchangeRates) => void;
+  onSaveRates?: (newRates: ExchangeRates) => void;
+  onSave?: (newRates: ExchangeRates) => void;
 }
 
 export const ExchangeRateModal: React.FC<ExchangeRateModalProps> = ({
@@ -14,6 +15,7 @@ export const ExchangeRateModal: React.FC<ExchangeRateModalProps> = ({
   onClose,
   rates,
   onSaveRates,
+  onSave,
 }) => {
   const [usdRate, setUsdRate] = useState<number>(rates.USD_TO_RMB);
   const [eurRate, setEurRate] = useState<number>(rates.EUR_TO_RMB);
@@ -29,11 +31,14 @@ export const ExchangeRateModal: React.FC<ExchangeRateModalProps> = ({
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    onSaveRates({
-      USD_TO_RMB: usdRate > 0 ? usdRate : 7.25,
-      EUR_TO_RMB: eurRate > 0 ? eurRate : 7.85,
-      GBP_TO_RMB: gbpRate > 0 ? gbpRate : 9.15,
-    });
+    const saveFn = onSave || onSaveRates;
+    if (saveFn) {
+      saveFn({
+        USD_TO_RMB: usdRate > 0 ? usdRate : 7.25,
+        EUR_TO_RMB: eurRate > 0 ? eurRate : 7.85,
+        GBP_TO_RMB: gbpRate > 0 ? gbpRate : 9.15,
+      });
+    }
     onClose();
   };
 

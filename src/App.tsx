@@ -169,14 +169,17 @@ export default function App() {
   const handleConfirmDelete = async () => {
     if (!itemToDelete) return;
     const idToDelete = itemToDelete.id;
+    const numToDelete = itemToDelete.inquiryNumber;
     setInquiries(prev => prev.filter(i => i.id !== idToDelete));
     setItemToDelete(null);
+    showToast(`Deleted inquiry ${numToDelete}`, 'success');
     if (user && user.uid) {
       try {
+        setSyncState(prev => ({ ...prev, isSyncing: true }));
         await deleteInquiryFromFirestore(user.uid, idToDelete);
-        showToast(`Deleted inquiry ${itemToDelete.inquiryNumber}`, 'success');
+        setSyncState(prev => ({ ...prev, isSyncing: false }));
       } catch (e) {
-        console.error(e);
+        console.error('Failed to delete inquiry from Firestore:', e);
       }
     }
   };
@@ -192,6 +195,60 @@ export default function App() {
       }
       return i;
     }));
+  };
+
+  const handleDuplicateInquiry = async (original: InquiryItem) => {
+    const year = new Date().getFullYear();
+    const prefix = `INQ-${year}-`;
+    let maxSeq = 0;
+    inquiries.forEach((item) => {
+      if (item.inquiryNumber && item.inquiryNumber.startsWith(prefix)) {
+        const numPart = parseInt(item.inquiryNumber.slice(prefix.length), 10);
+        if (!isNaN(numPart) && numPart > maxSeq) {
+          maxSeq = numPart;
+        }
+      }
+    });
+    const nextInquiryNumber = `${prefix}${String(maxSeq + 1).padStart(3, '0')}`;
+    const newId = `inq_${Date.now()}`;
+
+    // Deep clone quotes with unique IDs
+    const clonedQuotes = (original.quotes || []).map((q, idx) => ({
+      ...q,
+      id: `quote_${Date.now()}_${idx}`,
+    }));
+    const newSelectedQuoteId = clonedQuotes.length > 0 ? clonedQuotes[0].id : '';
+
+    // Deep clone helper commissions if any
+    const clonedCommissions = (original.helperCommissions || []).map((c, idx) => ({
+      ...c,
+      id: `comm_${Date.now()}_${idx}`,
+    }));
+
+    const duplicatedItem: InquiryItem = {
+      ...original,
+      id: newId,
+      inquiryNumber: nextInquiryNumber,
+      date: new Date().toISOString().split('T')[0],
+      orderStatus: 'New Inquiry',
+      quotes: clonedQuotes,
+      selectedQuoteId: newSelectedQuoteId,
+      helperCommissions: clonedCommissions,
+      updatedAt: new Date().toISOString(),
+    };
+
+    setInquiries((prev) => [duplicatedItem, ...prev]);
+    showToast(`Duplicated ${original.inquiryNumber} as ${nextInquiryNumber}`, 'success');
+
+    if (user && user.uid) {
+      try {
+        setSyncState((prev) => ({ ...prev, isSyncing: true }));
+        await saveInquiryToFirestore(user.uid, duplicatedItem);
+        setSyncState((prev) => ({ ...prev, isSyncing: false }));
+      } catch (error: any) {
+        console.error('Failed to save duplicated inquiry to Firestore:', error);
+      }
+    }
   };
 
   const handleSaveInquiry = async (savedItem: InquiryItem) => {
@@ -386,6 +443,7 @@ export default function App() {
               onDeleteRequest={handleDeleteRequest}
               onStatusChange={handleStatusChange}
               onQuickShare={(item) => setItemToShare(item)}
+              onDuplicate={handleDuplicateInquiry}
             />
           </>
         ) : (
@@ -426,6 +484,7 @@ export default function App() {
       {/* Modals */}
       <InquiryDetailModal
         isOpen={Boolean(itemToView)}
+        item={itemToView}
         inquiry={itemToView}
         usdToRmbRate={exchangeRates.USD_TO_RMB}
         onClose={() => setItemToView(null)}
@@ -437,6 +496,14 @@ export default function App() {
         onShare={(item) => {
           setItemToView(null);
           setItemToShare(item);
+        }}
+        onDuplicate={(item) => {
+          setItemToView(null);
+          handleDuplicateInquiry(item);
+        }}
+        onDeleteRequest={(item) => {
+          setItemToView(null);
+          handleDeleteRequest(item);
         }}
         onStatusChange={handleStatusChange}
       />
@@ -453,14 +520,17 @@ export default function App() {
       />
       <DeleteConfirmModal
         isOpen={Boolean(itemToDelete)}
-        onClose={() => setItemToDelete(null)}
-        onConfirm={handleConfirmDelete}
+        item={itemToDelete}
         inquiryNumber={itemToDelete?.inquiryNumber}
+        onClose={() => setItemToDelete(null)}
+        onCancel={() => setItemToDelete(null)}
+        onConfirm={handleConfirmDelete}
       />
       <QuoteExportModal
         isOpen={Boolean(itemToShare)}
-        onClose={() => setItemToShare(null)}
+        item={itemToShare}
         inquiry={itemToShare}
+        onClose={() => setItemToShare(null)}
         usdToRmbRate={exchangeRates.USD_TO_RMB}
       />
       <ExchangeRateModal

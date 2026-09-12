@@ -5,6 +5,7 @@ import {
   Edit2,
   Share2,
   Copy,
+  Trash2,
   Check,
   Package,
   Building2,
@@ -42,11 +43,14 @@ import { detectB2BPlatform } from '../lib/b2bPlatforms';
 
 interface InquiryDetailModalProps {
   isOpen: boolean;
-  item: InquiryItem | null;
+  item?: InquiryItem | null;
+  inquiry?: InquiryItem | null;
   usdToRmbRate: number;
   onClose: () => void;
   onEdit: (item: InquiryItem) => void;
   onShare: (item: InquiryItem) => void;
+  onDuplicate?: (item: InquiryItem) => void;
+  onDeleteRequest?: (item: InquiryItem) => void;
   onStatusChange: (item: InquiryItem, newStatus: OrderStatus) => void;
 }
 
@@ -66,15 +70,19 @@ const ALL_STATUSES: OrderStatus[] = [
 
 export const InquiryDetailModal: React.FC<InquiryDetailModalProps> = ({
   isOpen,
-  item,
+  item: propItem,
+  inquiry: propInquiry,
   usdToRmbRate,
   onClose,
   onEdit,
   onShare,
+  onDuplicate,
+  onDeleteRequest,
   onStatusChange,
 }) => {
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
+  const item = propItem || propInquiry;
   if (!isOpen || !item) return null;
 
   const rate = usdToRmbRate || 7.25;
@@ -799,15 +807,43 @@ export const InquiryDetailModal: React.FC<InquiryDetailModalProps> = ({
 
         {/* Modal Footer Actions */}
         <div className="px-5 py-3.5 border-t border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-2 shrink-0">
-          <button
-            id="detail-modal-close-bottom-btn"
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 font-medium text-xs transition"
-          >
-            Close
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              id="detail-modal-close-bottom-btn"
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 font-medium text-xs transition"
+            >
+              Close
+            </button>
+            {onDeleteRequest && (
+              <button
+                id="detail-modal-delete-btn"
+                onClick={() => {
+                  onClose();
+                  onDeleteRequest(item);
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 font-semibold text-xs transition shadow-2xs cursor-pointer"
+                title="Delete this inquiry"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete</span>
+              </button>
+            )}
+          </div>
 
           <div className="flex items-center gap-2">
+            {onDuplicate && (
+              <button
+                id="detail-modal-duplicate-btn"
+                onClick={() => onDuplicate(item)}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-amber-700 font-semibold text-xs transition shadow-2xs"
+                title="Duplicate this inquiry into a new quotation"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span>Duplicate</span>
+              </button>
+            )}
+
             <button
               id="detail-modal-share-btn"
               onClick={() => onShare(item)}
