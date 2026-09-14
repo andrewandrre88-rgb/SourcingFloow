@@ -184,9 +184,10 @@ export default function App() {
     }
   };
 
-  const handleStatusChange = async (id: string, status: OrderStatus) => {
+  const handleStatusChange = async (target: InquiryItem | string, status: OrderStatus) => {
+    const targetId = typeof target === 'string' ? target : target.id;
     setInquiries(prev => prev.map(i => {
-      if (i.id === id) {
+      if (i.id === targetId) {
         const updated = { ...i, orderStatus: status, updatedAt: new Date().toISOString() };
         if (user && user.uid) {
           saveInquiryToFirestore(user.uid, updated).catch(console.error);
@@ -195,6 +196,9 @@ export default function App() {
       }
       return i;
     }));
+
+    setItemToView(prev => (prev && prev.id === targetId ? { ...prev, orderStatus: status } : prev));
+    showToast(`Order status updated to "${status}"`, 'success');
   };
 
   const handleDuplicateInquiry = async (original: InquiryItem) => {
@@ -373,11 +377,20 @@ export default function App() {
         setUser(authenticatedUser);
         setNeedsAuth(false);
         setIsLoadingAuth(false);
+        if (typeof window !== 'undefined') {
+          (window as any).__FIREBASE_USER__ = authenticatedUser;
+          (window as any).__FIREBASE_UID__ = authenticatedUser.uid;
+        }
+        console.log('[SourcingFlow] Authenticated User UID:', authenticatedUser.uid, 'Email:', authenticatedUser.email);
       },
       () => {
         setUser(null);
         setNeedsAuth(true);
         setIsLoadingAuth(false);
+        if (typeof window !== 'undefined') {
+          (window as any).__FIREBASE_USER__ = null;
+          (window as any).__FIREBASE_UID__ = null;
+        }
       }
     );
 

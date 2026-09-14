@@ -510,10 +510,12 @@ export const InquiryTable: React.FC<InquiryTableProps> = ({
                         <select
                           id={`inquiry-status-select-${item.id}`}
                           value={item.orderStatus}
+                          onClick={(e) => e.stopPropagation()}
                           onChange={(e) => onStatusChange(item, e.target.value as OrderStatus)}
-                          className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border appearance-none pr-5 cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-500 ${getStatusBadgeStyle(
+                          className={`text-[10px] font-bold uppercase pl-2.5 pr-6 py-1 rounded-full border appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/40 hover:brightness-95 transition-all shadow-2xs ${getStatusBadgeStyle(
                             item.orderStatus
                           )}`}
+                          title="Change inquiry status"
                         >
                           {ALL_STATUSES.map((st) => (
                             <option key={st} value={st} className="bg-white text-slate-800 normal-case font-normal text-xs">
@@ -521,7 +523,7 @@ export const InquiryTable: React.FC<InquiryTableProps> = ({
                             </option>
                           ))}
                         </select>
-                        <ChevronDown className="w-2.5 h-2.5 absolute right-1.5 top-1.5 text-slate-500 pointer-events-none" />
+                        <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none" />
                       </div>
                     </td>
 
@@ -621,9 +623,12 @@ export const InquiryTable: React.FC<InquiryTableProps> = ({
                   </div>
                   <div className="relative inline-block">
                     <select
+                      id={`mobile-inquiry-status-select-${item.id}`}
                       value={item.orderStatus}
+                      onClick={(e) => e.stopPropagation()}
                       onChange={(e) => onStatusChange(item, e.target.value as OrderStatus)}
-                      className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border appearance-none pr-5 cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-500 ${getStatusBadgeStyle(item.orderStatus)}`}
+                      className={`text-[10px] font-bold uppercase pl-2.5 pr-6 py-1 rounded-full border appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/40 hover:brightness-95 transition-all shadow-2xs ${getStatusBadgeStyle(item.orderStatus)}`}
+                      title="Change inquiry status"
                     >
                       {ALL_STATUSES.map((st) => (
                         <option key={st} value={st} className="bg-white text-slate-800 normal-case font-normal text-xs">
@@ -631,7 +636,7 @@ export const InquiryTable: React.FC<InquiryTableProps> = ({
                         </option>
                       ))}
                     </select>
-                    <ChevronDown className="w-2.5 h-2.5 absolute right-1.5 top-1.5 text-slate-500 pointer-events-none" />
+                    <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none" />
                   </div>
                 </div>
 

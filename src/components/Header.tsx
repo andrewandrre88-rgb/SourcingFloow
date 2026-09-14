@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { User } from 'firebase/auth';
 import {
   Cloud,
@@ -10,6 +10,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Database,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { CloudSyncState, ExchangeRates, CurrencyViewMode } from '../types';
 
@@ -46,6 +48,16 @@ export const Header: React.FC<HeaderProps> = ({
   currentView,
   onViewChange,
 }) => {
+  const [copiedUid, setCopiedUid] = useState(false);
+
+  const handleCopyUid = () => {
+    if (user?.uid) {
+      navigator.clipboard.writeText(user.uid);
+      setCopiedUid(true);
+      setTimeout(() => setCopiedUid(false), 2000);
+    }
+  };
+
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
       <div className="w-full max-w-none mx-auto px-4 sm:px-6 lg:px-8 xl:px-10">
@@ -210,9 +222,20 @@ export const Header: React.FC<HeaderProps> = ({
                   <p className="text-xs font-semibold leading-tight text-slate-800 truncate max-w-[130px]">
                     {user.displayName || user.email?.split('@')[0]}
                   </p>
-                  <p className="text-[10px] text-slate-500 leading-none truncate max-w-[130px]">
-                    {user.email}
-                  </p>
+                  <div className="flex items-center justify-end gap-1">
+                    <p className="text-[10px] text-slate-500 leading-none truncate max-w-[110px]" title={user.email || ''}>
+                      {user.email}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleCopyUid}
+                      title={`Click to copy Firebase User UID: ${user.uid}`}
+                      className="inline-flex items-center text-[9px] px-1 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 transition"
+                    >
+                      {copiedUid ? <Check className="w-2.5 h-2.5 text-emerald-600" /> : <Copy className="w-2.5 h-2.5" />}
+                      <span className="ml-0.5 font-mono">{copiedUid ? 'Copied' : 'UID'}</span>
+                    </button>
+                  </div>
                 </div>
                 <button
                   id="header-logout-btn"
