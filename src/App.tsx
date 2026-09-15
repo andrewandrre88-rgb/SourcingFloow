@@ -439,7 +439,7 @@ export default function App() {
         onViewChange={setCurrentView}
       />
       
-      <main className="flex-1 w-full max-w-none mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-5 sm:py-6 space-y-6">
+      <main className="flex-1 w-full max-w-none mx-auto px-3 sm:px-6 lg:px-8 xl:px-10 py-3.5 sm:py-6 space-y-4 sm:space-y-6 pb-24 sm:pb-8">
         {currentView === 'inquiries' ? (
           <>
             <StatsBar inquiries={inquiries} exchangeRates={exchangeRates} />

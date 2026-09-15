@@ -57,7 +57,10 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({
   const [typeFilter, setTypeFilter] = useState<string>('All');
   const [countryFilter, setCountryFilter] = useState<string>('All');
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+  const [copiedWechatId, setCopiedWechatId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>(() =>
+    typeof window !== 'undefined' && window.innerWidth < 768 ? 'cards' : 'table'
+  );
 
   // Derive unique countries for filtering in alphabetical order
   const uniqueCountries = (
@@ -507,12 +510,13 @@ WeChat: ${customer.wechatId || 'N/A'}`;
                                 type="button"
                                 onClick={() => {
                                   navigator.clipboard.writeText(customer.wechatId || '');
-                                  alert(`Copied WeChat ID: ${customer.wechatId}`);
+                                  setCopiedWechatId(customer.id);
+                                  setTimeout(() => setCopiedWechatId(null), 2000);
                                 }}
                                 className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium hover:bg-emerald-100 transition"
                                 title={`Click to copy WeChat ID: ${customer.wechatId}`}
                               >
-                                WeChat: {customer.wechatId}
+                                {copiedWechatId === customer.id ? 'Copied WeChat!' : `WeChat: ${customer.wechatId}`}
                               </button>
                             )}
                             {!customer.contactEmail &&

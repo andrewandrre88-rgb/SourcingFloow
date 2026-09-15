@@ -142,31 +142,31 @@ export const InquiryTable: React.FC<InquiryTableProps> = ({
   return (
     <div className="bg-white border border-slate-200 rounded-lg shadow-xs overflow-hidden">
       {/* Search & Filter Header */}
-      <div className="px-4 sm:px-6 py-3 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+      <div className="px-3.5 sm:px-6 py-3 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row gap-2.5 sm:gap-3 items-stretch sm:items-center justify-between">
         {/* Search input */}
-        <div className="relative flex-1 max-w-sm sm:max-w-md lg:max-w-lg xl:max-w-xl">
-          <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400" />
+        <div className="relative flex-1 w-full sm:max-w-md lg:max-w-lg xl:max-w-xl">
+          <Search className="absolute left-3 top-3 sm:top-2.5 w-4 h-4 sm:w-3.5 sm:h-3.5 text-slate-400" />
           <input
             id="inquiry-search-input"
             type="text"
             placeholder="Search inquiries, clients, products, suppliers..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-300 rounded text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition shadow-xs"
+            className="w-full pl-9 pr-3 py-2.5 sm:py-1.5 bg-white border border-slate-300 rounded-lg sm:rounded text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition shadow-xs"
           />
         </div>
 
         {/* Status Filter Tabs */}
-        <div className="flex items-center space-x-2 overflow-x-auto pb-1 sm:pb-0">
-          <span className="text-xs font-medium text-slate-500 flex items-center gap-1 whitespace-nowrap">
-            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400" />
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5 whitespace-nowrap shrink-0">
+            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
             <span>Filter:</span>
           </span>
           <select
             id="inquiry-status-filter-select"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-white border border-slate-300 text-xs text-slate-700 rounded px-3 py-1.5 focus:outline-none focus:border-indigo-500 cursor-pointer shadow-xs font-medium"
+            className="flex-1 sm:flex-none bg-white border border-slate-300 text-xs text-slate-700 rounded-lg sm:rounded px-3 py-2.5 sm:py-1.5 focus:outline-none focus:border-indigo-500 cursor-pointer shadow-xs font-semibold"
           >
             <option value="All">All Inquiries ({inquiries.length})</option>
             {ALL_STATUSES.map((st) => (
@@ -593,12 +593,13 @@ export const InquiryTable: React.FC<InquiryTableProps> = ({
 
 
       {/* Mobile Card Layout */}
-      <div className="block lg:hidden divide-y divide-slate-200 border-t border-slate-200">
+      <div className="block lg:hidden p-3 space-y-3.5 bg-slate-100/70 border-t border-slate-200">
         {sorted.length === 0 ? (
-          <div className="py-12 text-center text-slate-500">
-            <div className="flex flex-col items-center justify-center space-y-1.5">
-              <FileText className="w-8 h-8 text-slate-300" />
-              <p className="text-sm font-medium text-slate-700">No sourcing inquiries found</p>
+          <div className="py-12 text-center text-slate-500 bg-white rounded-xl border border-slate-200 p-6">
+            <div className="flex flex-col items-center justify-center space-y-2">
+              <FileText className="w-9 h-9 text-slate-300" />
+              <p className="text-sm font-semibold text-slate-700">No sourcing inquiries found</p>
+              <p className="text-xs text-slate-400">Try changing your search term or status filter</p>
             </div>
           </div>
         ) : (
@@ -614,22 +615,33 @@ export const InquiryTable: React.FC<InquiryTableProps> = ({
             const helperCount = item.helperCommissions?.length || 0;
 
             return (
-              <div key={item.id} className="p-4 bg-white flex flex-col gap-3">
+              <div
+                key={item.id}
+                className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs hover:border-indigo-200 transition flex flex-col gap-3"
+              >
                 {/* Header: Inquiry + Status */}
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="font-mono font-bold text-indigo-600 text-sm">
-                      {item.inquiryNumber}
+                <div className="flex justify-between items-start gap-2">
+                  <div
+                    onClick={() => onView(item)}
+                    className="cursor-pointer group flex-1 min-w-0"
+                    title="Click to view full inquiry details"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono font-bold text-indigo-600 text-sm group-hover:underline">
+                        {item.inquiryNumber}
+                      </span>
                     </div>
-                    <div className="text-xs text-slate-400 mt-0.5">{item.date}</div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">{item.date}</div>
                   </div>
-                  <div className="relative inline-block">
+
+                  {/* Status Dropdown */}
+                  <div className="relative inline-block shrink-0">
                     <select
                       id={`mobile-inquiry-status-select-${item.id}`}
                       value={item.orderStatus}
                       onClick={(e) => e.stopPropagation()}
                       onChange={(e) => onStatusChange(item, e.target.value as OrderStatus)}
-                      className={`text-[10px] font-bold uppercase pl-2.5 pr-6 py-1 rounded-full border appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/40 hover:brightness-95 transition-all shadow-2xs ${getStatusBadgeStyle(item.orderStatus)}`}
+                      className={`text-[11px] font-bold uppercase pl-3 pr-7 py-1.5 rounded-full border appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/40 hover:brightness-95 transition-all shadow-2xs ${getStatusBadgeStyle(item.orderStatus)}`}
                       title="Change inquiry status"
                     >
                       {ALL_STATUSES.map((st) => (
@@ -638,37 +650,59 @@ export const InquiryTable: React.FC<InquiryTableProps> = ({
                         </option>
                       ))}
                     </select>
-                    <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none" />
+                    <ChevronDown className="w-3.5 h-3.5 absolute right-2 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none" />
                   </div>
                 </div>
 
                 {/* Customer & Country */}
-                <div className="flex justify-between items-end border-b border-slate-100 pb-2">
-                  <div>
-                    <div className="font-semibold text-slate-900 text-sm">{item.customerName}</div>
+                <div className="flex justify-between items-center border-b border-slate-100 pb-2.5">
+                  <div className="min-w-0 flex-1 pr-2">
+                    <div className="font-bold text-slate-900 text-sm truncate">{item.customerName}</div>
                     {item.wechatId && (
-                      <div className="text-xs text-emerald-600 font-medium">WeChat: {item.wechatId}</div>
+                      <div className="text-xs text-emerald-600 font-medium truncate mt-0.5">
+                        WeChat: {item.wechatId}
+                      </div>
                     )}
                   </div>
-                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
                     <span className="text-sm leading-none">{getCountryFlag(item.country)}</span>
-                    <span>{item.country || 'Global'}</span>
+                    <span className="truncate max-w-[110px]">{item.country || 'Global'}</span>
                   </span>
                 </div>
 
-                {/* Product Info */}
-                <div className="flex items-start gap-3 border-b border-slate-100 pb-2">
+                {/* Product Info (tap to view) */}
+                <div
+                  onClick={() => onView(item)}
+                  className="flex items-start gap-3 border-b border-slate-100 pb-2.5 cursor-pointer group"
+                  title="Click to view full inquiry details"
+                >
                   {item.imageUrl ? (
-                    <img src={item.imageUrl} alt="Product" className="w-14 h-14 rounded border border-slate-200 object-cover shrink-0 bg-white" referrerPolicy="no-referrer" />
+                    <img
+                      src={item.imageUrl}
+                      alt="Product"
+                      className="w-14 h-14 rounded-lg border border-slate-200 object-cover shrink-0 bg-white"
+                      referrerPolicy="no-referrer"
+                    />
                   ) : (
-                    <div className="w-14 h-14 rounded border border-slate-200 bg-slate-50 flex items-center justify-center shrink-0">
-                      <Package className="w-5 h-5 text-slate-400" />
+                    <div className="w-14 h-14 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center shrink-0 text-slate-400 group-hover:text-indigo-600 group-hover:border-indigo-200 transition">
+                      <Package className="w-6 h-6" />
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-slate-800 truncate">{item.product}</div>
-                    <div className="text-xs text-slate-500 mt-0.5">
-                      <span className="font-semibold text-slate-700">{Number(item.quantity || 1).toLocaleString()}</span> pcs
+                    <div className="text-sm font-semibold text-slate-900 group-hover:text-indigo-600 transition truncate">
+                      {item.product}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
+                      <span className="font-bold text-slate-800">
+                        {Number(item.quantity || 1).toLocaleString()}
+                      </span>
+                      <span>{item.quantityUnit || 'pcs'}</span>
+                      {item.supplierName && (
+                        <>
+                          <span className="text-slate-300">•</span>
+                          <span className="text-slate-600 truncate">{item.supplierName}</span>
+                        </>
+                      )}
                     </div>
                     {item.productUrl1688 && (() => {
                       const plat = detectB2BPlatform(item.productUrl1688);
@@ -677,7 +711,8 @@ export const InquiryTable: React.FC<InquiryTableProps> = ({
                           href={item.productUrl1688}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium border ${plat.badgeBg} ${plat.badgeText} ${plat.badgeBorder} mt-1`}
+                          onClick={(e) => e.stopPropagation()}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold border ${plat.badgeBg} ${plat.badgeText} ${plat.badgeBorder} mt-1.5 shadow-2xs hover:brightness-95`}
                           title={`Open ${plat.name}`}
                         >
                           <span className={`w-1.5 h-1.5 rounded-full ${plat.dotColor}`} />
@@ -689,43 +724,43 @@ export const InquiryTable: React.FC<InquiryTableProps> = ({
                   </div>
                 </div>
 
-                {/* Pricing summary */}
-                <div className="grid grid-cols-2 gap-2 text-sm bg-slate-50 p-2.5 rounded border border-slate-200">
+                {/* Pricing Summary 2x2 Grid */}
+                <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50/90 p-3 rounded-lg border border-slate-200/80">
                   <div>
-                    <div className="text-[10px] text-slate-500 font-bold uppercase">Supplier Cost</div>
-                    <div className="font-mono font-semibold text-slate-800">
+                    <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Supplier Cost</div>
+                    <div className="font-mono font-bold text-slate-800 text-xs sm:text-sm mt-0.5">
                       ¥{formatUnitPrice(item.price1688Rmb || 0, 'RMB')}
                     </div>
-                    <div className="text-[10px] text-slate-500 font-mono">
+                    <div className="text-[10px] text-slate-500 font-mono mt-0.5">
                       ≈ {formatUnitPrice(unitCostUsd, 'USD')}
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-[10px] text-slate-500 font-bold uppercase">Total Quote</div>
-                    <div className="font-bold font-mono text-slate-900">
+                    <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Total Quote</div>
+                    <div className="font-bold font-mono text-indigo-700 text-xs sm:text-sm mt-0.5">
                       {formatCurrency(item.totalQuotationUsd || 0, 'USD')}
                     </div>
-                    <div className="text-[10px] text-slate-500 font-mono">
+                    <div className="text-[10px] text-slate-500 font-mono mt-0.5">
                       ¥{formatCurrency((item.totalQuotationUsd || 0) * usdToRmbRate, 'RMB')}
                     </div>
                   </div>
                   <div>
-                    <div className="text-[10px] text-slate-500 font-bold uppercase">Gross Margin</div>
-                    <div className="text-emerald-600 font-bold font-mono text-xs">
+                    <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Gross Margin</div>
+                    <div className="text-emerald-700 font-bold font-mono text-xs mt-0.5">
                       +{item.marginPercent}% (+{formatCurrency(profitUsd, 'USD')})
                     </div>
-                    <div className="text-[10px] text-slate-400 font-mono">
+                    <div className="text-[10px] text-slate-400 font-mono mt-0.5">
                       +¥{formatCurrency(profitUsd * usdToRmbRate, 'RMB')}
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-[10px] text-slate-500 font-bold uppercase">
-                      {helpersCommissionUsd > 0 ? 'Your Net Profit' : 'Est. Profit'}
+                    <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                      {helpersCommissionUsd > 0 ? 'Net Profit' : 'Est. Profit'}
                     </div>
-                    <div className="text-emerald-700 font-bold font-mono text-xs">
+                    <div className="text-emerald-700 font-bold font-mono text-xs mt-0.5">
                       +{formatCurrency(helpersCommissionUsd > 0 ? netProfitUsd : profitUsd, 'USD')}
                     </div>
-                    <div className="text-[10px] text-emerald-600/80 font-mono">
+                    <div className="text-[10px] text-emerald-600/80 font-mono mt-0.5">
                       +¥{formatCurrency((helpersCommissionUsd > 0 ? netProfitUsd : profitUsd) * usdToRmbRate, 'RMB')}
                     </div>
                     {helpersCommissionUsd > 0 && (
@@ -736,45 +771,68 @@ export const InquiryTable: React.FC<InquiryTableProps> = ({
                   </div>
                 </div>
 
-                {/* Actions */}
-                <div className="flex justify-end gap-2 mt-1">
-                  <button
-                    id={`mobile-inquiry-view-btn-${item.id}`}
-                    onClick={() => onView(item)}
-                    className="p-2 text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded border border-slate-200 transition flex items-center gap-1 text-xs font-medium"
-                    title="View details"
-                  >
-                    <Eye className="w-4 h-4" /> View
-                  </button>
-                  <button
-                    id={`mobile-inquiry-share-btn-${item.id}`}
-                    onClick={() => onQuickShare(item)}
-                    className="p-2 text-slate-600 hover:text-emerald-600 hover:bg-slate-100 rounded border border-slate-200 transition flex items-center gap-1 text-xs font-medium"
-                  >
-                    <Share2 className="w-4 h-4" /> Share
-                  </button>
-                  <button
-                    id={`mobile-inquiry-edit-btn-${item.id}`}
-                    onClick={() => onEdit(item)}
-                    className="p-2 text-slate-600 hover:text-blue-600 hover:bg-slate-100 rounded border border-slate-200 transition flex items-center gap-1 text-xs font-medium"
-                  >
-                    <Edit2 className="w-4 h-4" /> Edit
-                  </button>
-                  <button
-                    id={`mobile-inquiry-duplicate-btn-${item.id}`}
-                    onClick={() => onDuplicate(item)}
-                    title="Duplicate inquiry"
-                    className="p-2 text-slate-600 hover:text-amber-600 hover:bg-slate-100 rounded border border-slate-200 transition flex items-center gap-1 text-xs font-medium"
-                  >
-                    <Copy className="w-4 h-4" /> Duplicate
-                  </button>
-                  <button
-                    id={`mobile-inquiry-delete-btn-${item.id}`}
-                    onClick={() => onDeleteRequest(item)}
-                    className="p-2 text-slate-600 hover:text-rose-600 hover:bg-slate-100 rounded border border-slate-200 transition flex items-center gap-1 text-xs font-medium"
-                  >
-                    <Trash2 className="w-4 h-4" /> Delete
-                  </button>
+                {/* Mobile Action Buttons Bar */}
+                <div className="pt-2.5 border-t border-slate-100 flex flex-col gap-2">
+                  {/* Row 1: Primary View Details & Share Quote */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      id={`mobile-inquiry-view-btn-${item.id}`}
+                      onClick={() => onView(item)}
+                      className="flex-1 min-w-0 inline-flex items-center justify-center gap-2 px-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer"
+                      title="View full inquiry details and breakdown"
+                    >
+                      <Eye className="w-4 h-4 shrink-0 text-white stroke-[2.2]" />
+                      <span className="truncate">View Details</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      id={`mobile-inquiry-share-btn-${item.id}`}
+                      onClick={() => onQuickShare(item)}
+                      className="flex-1 min-w-0 inline-flex items-center justify-center gap-2 px-3 py-2.5 bg-emerald-50 hover:bg-emerald-100 active:scale-[0.98] text-emerald-800 border border-emerald-300 rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
+                      title="Generate shareable quotation card"
+                    >
+                      <Share2 className="w-4 h-4 shrink-0 text-emerald-600 stroke-[2.2]" />
+                      <span className="truncate">Share Quote</span>
+                    </button>
+                  </div>
+
+                  {/* Row 2: Secondary Quick Actions */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      id={`mobile-inquiry-edit-btn-${item.id}`}
+                      onClick={() => onEdit(item)}
+                      className="inline-flex items-center justify-center gap-1.5 px-2.5 py-2 bg-slate-50 hover:bg-slate-100 active:scale-[0.98] text-slate-700 hover:text-blue-700 rounded-lg border border-slate-200 text-xs font-medium transition cursor-pointer"
+                      title="Edit inquiry parameters"
+                    >
+                      <Edit2 className="w-3.5 h-3.5 shrink-0 text-blue-600" />
+                      <span>Edit</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      id={`mobile-inquiry-duplicate-btn-${item.id}`}
+                      onClick={() => onDuplicate(item)}
+                      className="inline-flex items-center justify-center gap-1.5 px-2.5 py-2 bg-slate-50 hover:bg-slate-100 active:scale-[0.98] text-slate-700 hover:text-amber-700 rounded-lg border border-slate-200 text-xs font-medium transition cursor-pointer"
+                      title="Duplicate inquiry"
+                    >
+                      <Copy className="w-3.5 h-3.5 shrink-0 text-amber-600" />
+                      <span>Duplicate</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      id={`mobile-inquiry-delete-btn-${item.id}`}
+                      onClick={() => onDeleteRequest(item)}
+                      className="inline-flex items-center justify-center gap-1.5 px-2.5 py-2 bg-rose-50 hover:bg-rose-100 active:scale-[0.98] text-rose-700 rounded-lg border border-rose-200 text-xs font-medium transition cursor-pointer"
+                      title="Delete inquiry"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 shrink-0 text-rose-600" />
+                      <span>Delete</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             );

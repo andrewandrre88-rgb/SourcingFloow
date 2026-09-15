@@ -176,34 +176,34 @@ export const InquiryDetailModal: React.FC<InquiryDetailModalProps> = ({
         className="bg-white border border-slate-200 rounded-xl max-w-2xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150"
       >
         {/* Modal Header */}
-        <div className="px-5 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600">
-              <FileText className="w-5 h-5" />
+        <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="p-2 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 shrink-0">
+              <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-slate-900 font-mono">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                <h2 className="text-sm sm:text-base font-bold text-slate-900 font-mono truncate">
                   {item.inquiryNumber}
                 </h2>
-                <span className="text-xs text-slate-400 font-medium flex items-center gap-1">
+                <span className="text-[11px] sm:text-xs text-slate-400 font-medium flex items-center gap-1 shrink-0">
                   <Calendar className="w-3 h-3" />
                   {item.date}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-medium">
+              <p className="text-[11px] sm:text-xs text-slate-500 font-medium truncate">
                 Inquiry Details & Quotation Breakdown
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Status dropdown */}
             <select
               id="detail-modal-status-select"
               value={item.orderStatus}
               onChange={(e) => onStatusChange(item, e.target.value as OrderStatus)}
-              className={`text-xs font-bold uppercase px-2.5 py-1 rounded-full border cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 ${getStatusBadgeStyle(
+              className={`text-[10px] sm:text-xs font-bold uppercase px-2 sm:px-2.5 py-1 rounded-full border cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 ${getStatusBadgeStyle(
                 item.orderStatus
               )}`}
             >
@@ -226,7 +226,7 @@ export const InquiryDetailModal: React.FC<InquiryDetailModalProps> = ({
         </div>
 
         {/* Modal Scrollable Body */}
-        <div className="p-5 overflow-y-auto space-y-5 text-slate-800 text-xs">
+        <div className="p-3.5 sm:p-5 overflow-y-auto space-y-4 sm:space-y-5 text-slate-800 text-xs">
           {/* Top Grid: Product & Client Overview */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Product Card */}
@@ -863,12 +863,12 @@ export const InquiryDetailModal: React.FC<InquiryDetailModalProps> = ({
         </div>
 
         {/* Modal Footer Actions */}
-        <div className="px-5 py-3.5 border-t border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-2 shrink-0">
+        <div className="px-3.5 sm:px-5 py-3 border-t border-slate-200 bg-slate-50 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shrink-0">
           <div className="flex items-center gap-2">
             <button
               id="detail-modal-close-bottom-btn"
               onClick={onClose}
-              className="px-4 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 font-medium text-xs transition"
+              className="flex-1 sm:flex-none px-4 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 font-medium text-xs transition text-center"
             >
               Close
             </button>
@@ -879,7 +879,7 @@ export const InquiryDetailModal: React.FC<InquiryDetailModalProps> = ({
                   onClose();
                   onDeleteRequest(item);
                 }}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 font-semibold text-xs transition shadow-2xs cursor-pointer"
+                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 font-semibold text-xs transition shadow-2xs cursor-pointer"
                 title="Delete this inquiry"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -888,12 +888,12 @@ export const InquiryDetailModal: React.FC<InquiryDetailModalProps> = ({
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {onDuplicate && (
               <button
                 id="detail-modal-duplicate-btn"
                 onClick={() => onDuplicate(item)}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-amber-700 font-semibold text-xs transition shadow-2xs"
+                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-amber-700 font-semibold text-xs transition shadow-2xs"
                 title="Duplicate this inquiry into a new quotation"
               >
                 <Copy className="w-3.5 h-3.5" />
@@ -904,16 +904,16 @@ export const InquiryDetailModal: React.FC<InquiryDetailModalProps> = ({
             <button
               id="detail-modal-share-btn"
               onClick={() => onShare(item)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-indigo-600 font-semibold text-xs transition shadow-2xs"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-white border border-emerald-300 hover:bg-emerald-50 text-emerald-800 font-semibold text-xs transition shadow-2xs"
             >
-              <Share2 className="w-3.5 h-3.5" />
+              <Share2 className="w-3.5 h-3.5 text-emerald-600" />
               <span>Share Quote</span>
             </button>
 
             <button
               id="detail-modal-edit-btn"
               onClick={() => onEdit(item)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition shadow-xs active:scale-95"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition shadow-xs active:scale-95"
             >
               <Edit2 className="w-3.5 h-3.5" />
               <span>Edit Details</span>
