@@ -23,6 +23,8 @@ import {
   getCountryFlag,
   cleanPhoneNumber,
   getWhatsAppWebUrl,
+  getWhatsAppMessengerUrl,
+  openWhatsAppMessenger,
   getWhatsAppUniversalUrl,
 } from '../lib/countryFlags';
 
@@ -104,17 +106,14 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
     });
   };
 
+  const handleOpenWhatsAppMessenger = () => {
+    if (!formData.whatsapp) return;
+    openWhatsAppMessenger(formData.whatsapp, testMessage);
+  };
+
   const handleOpenWhatsAppWeb = () => {
     if (!formData.whatsapp) return;
     const url = getWhatsAppWebUrl(formData.whatsapp, testMessage);
-    if (url) {
-      window.open(url, '_blank', 'noopener,noreferrer');
-    }
-  };
-
-  const handleOpenWhatsAppUniversal = () => {
-    if (!formData.whatsapp) return;
-    const url = getWhatsAppUniversalUrl(formData.whatsapp, testMessage);
     if (url) {
       window.open(url, '_blank', 'noopener,noreferrer');
     }
@@ -252,15 +251,15 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
             </div>
           </div>
 
-          {/* Section 2: Direct WhatsApp Web Redirect & Call Banner */}
+          {/* Section 2: Direct WhatsApp Messenger & Web Redirect Banner */}
           <div className="p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-lg space-y-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-emerald-800 font-semibold text-xs">
                 <MessageCircle className="w-4 h-4 text-emerald-600" />
-                <span>WhatsApp Web Integration (Direct Chat & Call)</span>
+                <span>WhatsApp Messenger Integration (Direct Chat & Call)</span>
               </div>
               <span className="text-[10px] bg-emerald-100 text-emerald-700 font-semibold px-2 py-0.5 rounded-full border border-emerald-200">
-                1-Click Redirect
+                Direct to Messenger
               </span>
             </div>
 
@@ -290,24 +289,24 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={handleOpenWhatsAppWeb}
+                    onClick={handleOpenWhatsAppMessenger}
                     disabled={!cleanDigits}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold shadow-2xs transition disabled:opacity-40 disabled:cursor-not-allowed"
-                    title="Open directly in WhatsApp Web browser tab"
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold shadow-2xs transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                    title="Open directly in WhatsApp Messenger (com.whatsapp) - NOT WhatsApp Business"
                   >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    <span>Open WhatsApp Web</span>
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    <span>WhatsApp Messenger</span>
                   </button>
 
                   <button
                     type="button"
-                    onClick={handleOpenWhatsAppUniversal}
+                    onClick={handleOpenWhatsAppWeb}
                     disabled={!cleanDigits}
-                    className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 bg-white hover:bg-emerald-100/50 text-emerald-800 border border-emerald-300 rounded-md text-xs font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed"
-                    title="Open wa.me link (works on Mobile or Desktop app)"
+                    className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 bg-white hover:bg-emerald-100/50 text-emerald-800 border border-emerald-300 rounded-md text-xs font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                    title="Or open in WhatsApp Web browser tab"
                   >
-                    <PhoneCall className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>App</span>
+                    <ExternalLink className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Web</span>
                   </button>
                 </div>
 

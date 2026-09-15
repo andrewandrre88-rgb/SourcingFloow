@@ -29,6 +29,8 @@ import {
   getCountryFlag,
   cleanPhoneNumber,
   getWhatsAppWebUrl,
+  getWhatsAppMessengerUrl,
+  openWhatsAppMessenger,
   getWhatsAppUniversalUrl,
 } from '../lib/countryFlags';
 import { formatCurrency } from '../lib/currency';
@@ -350,7 +352,7 @@ WeChat: ${customer.wechatId || 'N/A'}`;
                   <th className="px-4 py-2.5">Client & Company</th>
                   <th className="px-4 py-2.5">Status</th>
                   <th className="px-4 py-2.5">Country & Port</th>
-                  <th className="px-4 py-2.5">Direct WhatsApp Web</th>
+                  <th className="px-4 py-2.5">WhatsApp Messenger</th>
                   <th className="px-4 py-2.5">Other Contacts</th>
                   <th className="px-4 py-2.5 text-center">Inquiries</th>
                   <th className="px-4 py-2.5 text-right">Actions</th>
@@ -361,6 +363,10 @@ WeChat: ${customer.wechatId || 'N/A'}`;
                   filteredCustomers.map((customer) => {
                     const flag = getCountryFlag(customer.country);
                     const cleanPhone = cleanPhoneNumber(customer.whatsapp);
+                    const messengerUrl = getWhatsAppMessengerUrl(
+                      customer.whatsapp || '',
+                      `Hello ${customer.name}, this is regarding your sourcing inquiry.`
+                    );
                     const webUrl = getWhatsAppWebUrl(
                       customer.whatsapp || '',
                       `Hello ${customer.name}, this is regarding your sourcing inquiry.`
@@ -433,30 +439,36 @@ WeChat: ${customer.wechatId || 'N/A'}`;
                           )}
                         </td>
 
-                        {/* WhatsApp Web Direct Launcher */}
+                        {/* WhatsApp Messenger Direct Launcher */}
                         <td className="px-4 py-3">
                           {cleanPhone ? (
                             <div className="flex items-center gap-1.5">
                               <a
-                                href={webUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-md text-[11px] shadow-2xs transition active:scale-95 group"
-                                title={`Open WhatsApp Web directly to chat/call: ${customer.whatsapp}`}
+                                id={`client-whatsapp-messenger-${customer.id}`}
+                                href={messengerUrl}
+                                onClick={(e) => {
+                                  // Open directly in WhatsApp Messenger, bypassing WhatsApp Business
+                                  openWhatsAppMessenger(
+                                    customer.whatsapp || '',
+                                    `Hello ${customer.name}, this is regarding your sourcing inquiry.`
+                                  );
+                                }}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-md text-[11px] shadow-2xs transition active:scale-95 group cursor-pointer"
+                                title={`Open directly in WhatsApp Messenger (com.whatsapp) - NOT WhatsApp Business: ${customer.whatsapp}`}
                               >
                                 <MessageCircle className="w-3.5 h-3.5" />
-                                <span>WhatsApp Web</span>
-                                <ExternalLink className="w-2.5 h-2.5 opacity-70 group-hover:opacity-100" />
+                                <span>WhatsApp Messenger</span>
                               </a>
 
                               <a
-                                href={universalUrl}
+                                id={`client-whatsapp-web-${customer.id}`}
+                                href={webUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="p-1 text-emerald-700 hover:bg-emerald-100/60 rounded border border-emerald-300 transition"
-                                title="Open in WhatsApp Mobile / Desktop App (wa.me)"
+                                className="p-1 text-emerald-700 hover:bg-emerald-100/70 hover:text-emerald-900 rounded border border-emerald-300 transition"
+                                title="Or open in WhatsApp Web browser tab"
                               >
-                                <PhoneCall className="w-3.5 h-3.5" />
+                                <ExternalLink className="w-3.5 h-3.5" />
                               </a>
 
                               <span className="text-[10px] font-mono text-slate-500 ml-1">
@@ -604,6 +616,10 @@ WeChat: ${customer.wechatId || 'N/A'}`;
               filteredCustomers.map((customer) => {
                 const flag = getCountryFlag(customer.country);
                 const cleanPhone = cleanPhoneNumber(customer.whatsapp);
+                const messengerUrl = getWhatsAppMessengerUrl(
+                  customer.whatsapp || '',
+                  `Hello ${customer.name}, this is regarding your sourcing inquiry.`
+                );
                 const webUrl = getWhatsAppWebUrl(
                   customer.whatsapp || '',
                   `Hello ${customer.name}, this is regarding your sourcing inquiry.`
@@ -683,23 +699,27 @@ WeChat: ${customer.wechatId || 'N/A'}`;
                       {cleanPhone ? (
                         <div className="flex items-center gap-1.5">
                           <a
+                            href={messengerUrl}
+                            onClick={(e) => {
+                              openWhatsAppMessenger(
+                                customer.whatsapp || '',
+                                `Hello ${customer.name}, this is regarding your sourcing inquiry.`
+                              );
+                            }}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold shadow-2xs transition"
+                            title="Open directly in WhatsApp Messenger (not Business)"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                            <span>WhatsApp Messenger</span>
+                          </a>
+                          <a
                             href={webUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold shadow-2xs transition"
-                            title="Open WhatsApp Web to chat or call"
-                          >
-                            <MessageCircle className="w-3.5 h-3.5" />
-                            <span>WhatsApp Web</span>
-                          </a>
-                          <a
-                            href={universalUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
                             className="p-1.5 text-emerald-800 hover:bg-emerald-50 border border-emerald-300 rounded-md transition"
-                            title="Call via mobile/desktop app"
+                            title="Or open in WhatsApp Web browser tab"
                           >
-                            <PhoneCall className="w-3.5 h-3.5" />
+                            <ExternalLink className="w-3.5 h-3.5" />
                           </a>
                         </div>
                       ) : (

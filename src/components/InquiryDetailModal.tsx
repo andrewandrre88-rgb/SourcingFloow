@@ -41,7 +41,13 @@ import {
   calculatePackagingDetails,
 } from '../lib/currency';
 import { detectB2BPlatform } from '../lib/b2bPlatforms';
-import { getCountryFlag, cleanPhoneNumber, getWhatsAppWebUrl } from '../lib/countryFlags';
+import {
+  getCountryFlag,
+  cleanPhoneNumber,
+  getWhatsAppWebUrl,
+  getWhatsAppMessengerUrl,
+  openWhatsAppMessenger,
+} from '../lib/countryFlags';
 
 interface InquiryDetailModalProps {
   isOpen: boolean;
@@ -316,7 +322,18 @@ export const InquiryDetailModal: React.FC<InquiryDetailModalProps> = ({
 
                   {item.customerContact && (() => {
                     const clean = cleanPhoneNumber(item.customerContact);
-                    const waWebUrl = clean ? getWhatsAppWebUrl(item.customerContact, `Hello ${item.customerName}, regarding inquiry ${item.inquiryNumber} for ${item.product}:`) : null;
+                    const messengerUrl = clean
+                      ? getWhatsAppMessengerUrl(
+                          item.customerContact,
+                          `Hello ${item.customerName}, regarding inquiry ${item.inquiryNumber} for ${item.product}:`
+                        )
+                      : null;
+                    const waWebUrl = clean
+                      ? getWhatsAppWebUrl(
+                          item.customerContact,
+                          `Hello ${item.customerName}, regarding inquiry ${item.inquiryNumber} for ${item.product}:`
+                        )
+                      : null;
 
                     return (
                       <div className="flex items-center justify-between text-slate-600 bg-white p-2 rounded border border-slate-200/70">
@@ -325,17 +342,35 @@ export const InquiryDetailModal: React.FC<InquiryDetailModalProps> = ({
                             <Phone className="w-3 h-3 text-slate-400" />
                             {item.customerContact}
                           </span>
-                          {waWebUrl && (
-                            <a
-                              href={waWebUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-2xs"
-                              title="Chat / Call via WhatsApp Web directly"
-                            >
-                              <MessageCircle className="w-3 h-3" />
-                              <span>WhatsApp Web</span>
-                            </a>
+                          {messengerUrl && (
+                            <div className="flex items-center gap-1">
+                              <a
+                                href={messengerUrl}
+                                onClick={(e) => {
+                                  openWhatsAppMessenger(
+                                    item.customerContact || '',
+                                    `Hello ${item.customerName}, regarding inquiry ${item.inquiryNumber} for ${item.product}:`
+                                  );
+                                }}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-2xs cursor-pointer"
+                                title="Open in WhatsApp Messenger (com.whatsapp) - NOT WhatsApp Business"
+                              >
+                                <MessageCircle className="w-3 h-3" />
+                                <span>WhatsApp Messenger</span>
+                              </a>
+                              {waWebUrl && (
+                                <a
+                                  href={waWebUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 transition"
+                                  title="Or open in WhatsApp Web browser tab"
+                                >
+                                  <ExternalLink className="w-2.5 h-2.5 text-emerald-600" />
+                                  <span>Web</span>
+                                </a>
+                              )}
+                            </div>
                           )}
                         </div>
                         <button
