@@ -32,6 +32,7 @@ import {
   getWhatsAppMessengerUrl,
   openWhatsAppMessenger,
   getWhatsAppUniversalUrl,
+  DEFAULT_WHATSAPP_MESSAGE,
 } from '../lib/countryFlags';
 import { formatCurrency } from '../lib/currency';
 
@@ -365,11 +366,11 @@ WeChat: ${customer.wechatId || 'N/A'}`;
                     const cleanPhone = cleanPhoneNumber(customer.whatsapp);
                     const messengerUrl = getWhatsAppMessengerUrl(
                       customer.whatsapp || '',
-                      `Hello ${customer.name}, this is regarding your sourcing inquiry.`
+                      DEFAULT_WHATSAPP_MESSAGE
                     );
                     const webUrl = getWhatsAppWebUrl(
                       customer.whatsapp || '',
-                      `Hello ${customer.name}, this is regarding your sourcing inquiry.`
+                      DEFAULT_WHATSAPP_MESSAGE
                     );
                     const universalUrl = getWhatsAppUniversalUrl(customer.whatsapp || '');
                     const clientInquiries = getClientInquiries(customer.name);
@@ -450,7 +451,7 @@ WeChat: ${customer.wechatId || 'N/A'}`;
                                   // Open directly in WhatsApp Messenger, bypassing WhatsApp Business
                                   openWhatsAppMessenger(
                                     customer.whatsapp || '',
-                                    `Hello ${customer.name}, this is regarding your sourcing inquiry.`
+                                    DEFAULT_WHATSAPP_MESSAGE
                                   );
                                 }}
                                 className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-md text-[11px] shadow-2xs transition active:scale-95 group cursor-pointer"
@@ -618,11 +619,11 @@ WeChat: ${customer.wechatId || 'N/A'}`;
                 const cleanPhone = cleanPhoneNumber(customer.whatsapp);
                 const messengerUrl = getWhatsAppMessengerUrl(
                   customer.whatsapp || '',
-                  `Hello ${customer.name}, this is regarding your sourcing inquiry.`
+                  DEFAULT_WHATSAPP_MESSAGE
                 );
                 const webUrl = getWhatsAppWebUrl(
                   customer.whatsapp || '',
-                  `Hello ${customer.name}, this is regarding your sourcing inquiry.`
+                  DEFAULT_WHATSAPP_MESSAGE
                 );
                 const universalUrl = getWhatsAppUniversalUrl(customer.whatsapp || '');
                 const clientInquiries = getClientInquiries(customer.name);
@@ -703,7 +704,7 @@ WeChat: ${customer.wechatId || 'N/A'}`;
                             onClick={(e) => {
                               openWhatsAppMessenger(
                                 customer.whatsapp || '',
-                                `Hello ${customer.name}, this is regarding your sourcing inquiry.`
+                                DEFAULT_WHATSAPP_MESSAGE
                               );
                             }}
                             className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold shadow-2xs transition"

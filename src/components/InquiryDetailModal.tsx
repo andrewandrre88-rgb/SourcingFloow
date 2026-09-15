@@ -47,6 +47,7 @@ import {
   getWhatsAppWebUrl,
   getWhatsAppMessengerUrl,
   openWhatsAppMessenger,
+  DEFAULT_WHATSAPP_MESSAGE,
 } from '../lib/countryFlags';
 
 interface InquiryDetailModalProps {
@@ -325,13 +326,13 @@ export const InquiryDetailModal: React.FC<InquiryDetailModalProps> = ({
                     const messengerUrl = clean
                       ? getWhatsAppMessengerUrl(
                           item.customerContact,
-                          `Hello ${item.customerName}, regarding inquiry ${item.inquiryNumber} for ${item.product}:`
+                          DEFAULT_WHATSAPP_MESSAGE
                         )
                       : null;
                     const waWebUrl = clean
                       ? getWhatsAppWebUrl(
                           item.customerContact,
-                          `Hello ${item.customerName}, regarding inquiry ${item.inquiryNumber} for ${item.product}:`
+                          DEFAULT_WHATSAPP_MESSAGE
                         )
                       : null;
 
@@ -349,7 +350,7 @@ export const InquiryDetailModal: React.FC<InquiryDetailModalProps> = ({
                                 onClick={(e) => {
                                   openWhatsAppMessenger(
                                     item.customerContact || '',
-                                    `Hello ${item.customerName}, regarding inquiry ${item.inquiryNumber} for ${item.product}:`
+                                    DEFAULT_WHATSAPP_MESSAGE
                                   );
                                 }}
                                 className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-2xs cursor-pointer"

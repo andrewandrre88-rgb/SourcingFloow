@@ -267,13 +267,16 @@ export function cleanPhoneNumber(phone?: string): string {
   return phone.replace(/[^\d]/g, '');
 }
 
+export const DEFAULT_WHATSAPP_MESSAGE = 'السلام عليكم ورحمة الله وبركاته';
+
 /**
  * Builds direct WhatsApp Web URL (opens web.whatsapp.com directly)
  */
-export function getWhatsAppWebUrl(phone: string, message: string = ''): string {
+export function getWhatsAppWebUrl(phone: string, message: string = DEFAULT_WHATSAPP_MESSAGE): string {
   const digits = cleanPhoneNumber(phone);
   if (!digits) return '';
-  const encoded = message ? encodeURIComponent(message) : '';
+  const msgToSend = message !== undefined && message !== null ? message : DEFAULT_WHATSAPP_MESSAGE;
+  const encoded = msgToSend ? encodeURIComponent(msgToSend) : '';
   return `https://web.whatsapp.com/send?phone=${digits}${encoded ? `&text=${encoded}` : ''}`;
 }
 
@@ -282,10 +285,11 @@ export function getWhatsAppWebUrl(phone: string, message: string = ''): string {
  * - On Android, uses Intent with 'package=com.whatsapp' so Android NEVER routes to WhatsApp Business ('com.whatsapp.w4b').
  * - On iOS, macOS, Windows, uses native 'whatsapp://send?phone=...' URI scheme for WhatsApp Messenger.
  */
-export function getWhatsAppMessengerUrl(phone: string, message: string = ''): string {
+export function getWhatsAppMessengerUrl(phone: string, message: string = DEFAULT_WHATSAPP_MESSAGE): string {
   const digits = cleanPhoneNumber(phone);
   if (!digits) return '';
-  const encoded = message ? encodeURIComponent(message) : '';
+  const msgToSend = message !== undefined && message !== null ? message : DEFAULT_WHATSAPP_MESSAGE;
+  const encoded = msgToSend ? encodeURIComponent(msgToSend) : '';
 
   if (typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent || '')) {
     return `intent://send?phone=${digits}${encoded ? `&text=${encoded}` : ''}#Intent;package=com.whatsapp;scheme=whatsapp;end`;
@@ -297,7 +301,7 @@ export function getWhatsAppMessengerUrl(phone: string, message: string = ''): st
 /**
  * Programmatically opens WhatsApp Messenger directly, ensuring WhatsApp Business is bypassed.
  */
-export function openWhatsAppMessenger(phone: string, message: string = ''): void {
+export function openWhatsAppMessenger(phone: string, message: string = DEFAULT_WHATSAPP_MESSAGE): void {
   const url = getWhatsAppMessengerUrl(phone, message);
   if (!url || typeof window === 'undefined') return;
   window.location.href = url;
@@ -306,7 +310,7 @@ export function openWhatsAppMessenger(phone: string, message: string = ''): void
 /**
  * Builds universal WhatsApp URL (wa.me) or direct messenger URL
  */
-export function getWhatsAppUniversalUrl(phone: string, message: string = ''): string {
+export function getWhatsAppUniversalUrl(phone: string, message: string = DEFAULT_WHATSAPP_MESSAGE): string {
   // Use direct messenger URL to prevent WhatsApp Business hijacking
   return getWhatsAppMessengerUrl(phone, message);
 }

@@ -26,6 +26,7 @@ import {
   getWhatsAppMessengerUrl,
   openWhatsAppMessenger,
   getWhatsAppUniversalUrl,
+  DEFAULT_WHATSAPP_MESSAGE,
 } from '../lib/countryFlags';
 
 interface CustomerModalProps {
@@ -57,7 +58,7 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
     notes: '',
   });
 
-  const [testMessage, setTestMessage] = useState('Hello, this is regarding your sourcing inquiry.');
+  const [testMessage, setTestMessage] = useState(DEFAULT_WHATSAPP_MESSAGE);
   const [showWhatsAppPreview, setShowWhatsAppPreview] = useState(false);
 
   useEffect(() => {
@@ -82,6 +83,7 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
         website: '',
         notes: '',
       });
+      setTestMessage(DEFAULT_WHATSAPP_MESSAGE);
     }
   }, [customerToEdit, isOpen]);
 
@@ -323,7 +325,7 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
             {showWhatsAppPreview && (
               <div className="pt-2 border-t border-emerald-200/80">
                 <label className="block text-[10px] font-semibold text-emerald-900 mb-1">
-                  Pre-filled Message for WhatsApp Web:
+                  Pre-filled Message for WhatsApp:
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -331,18 +333,15 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
                     value={testMessage}
                     onChange={(e) => setTestMessage(e.target.value)}
                     className="flex-1 px-2.5 py-1 bg-white border border-emerald-300 rounded text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                    placeholder="Type custom note or inquiry greeting..."
+                    placeholder="Type greeting message..."
                   />
                   <button
                     type="button"
-                    onClick={() =>
-                      setTestMessage(
-                        `Hello ${formData.name || 'Client'}, regarding your recent sourcing inquiry on our platform:`
-                      )
-                    }
-                    className="px-2 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded text-[10px] font-semibold transition"
+                    onClick={() => setTestMessage(DEFAULT_WHATSAPP_MESSAGE)}
+                    className="px-2 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded text-[10px] font-semibold transition cursor-pointer"
+                    title="Reset to السلام عليكم ورحمة الله وبركاته"
                   >
-                    Auto-fill Name
+                    Default Greeting
                   </button>
                 </div>
               </div>
