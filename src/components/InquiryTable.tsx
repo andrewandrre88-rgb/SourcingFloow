@@ -29,6 +29,7 @@ import {
   calculateTotalHelperCommissions,
 } from '../lib/currency';
 import { detectB2BPlatform } from '../lib/b2bPlatforms';
+import { getCountryFlag } from '../lib/countryFlags';
 
 interface InquiryTableProps {
   inquiries: InquiryItem[];
@@ -320,8 +321,9 @@ export const InquiryTable: React.FC<InquiryTableProps> = ({
 
                     {/* Country */}
                     <td className="py-2.5 px-4 whitespace-nowrap">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
-                        {item.country || 'Global'}
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                        <span className="text-sm leading-none">{getCountryFlag(item.country)}</span>
+                        <span>{item.country || 'Global'}</span>
                       </span>
                     </td>
 
@@ -648,8 +650,9 @@ export const InquiryTable: React.FC<InquiryTableProps> = ({
                       <div className="text-xs text-emerald-600 font-medium">WeChat: {item.wechatId}</div>
                     )}
                   </div>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
-                    {item.country || 'Global'}
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                    <span className="text-sm leading-none">{getCountryFlag(item.country)}</span>
+                    <span>{item.country || 'Global'}</span>
                   </span>
                 </div>
 

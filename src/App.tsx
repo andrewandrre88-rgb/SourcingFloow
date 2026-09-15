@@ -462,6 +462,7 @@ export default function App() {
         ) : (
           <CustomersPage 
             customers={customers}
+            inquiries={inquiries}
             onAdd={() => {
               setCustomerToEdit(null);
               setIsCustomerModalOpen(true);
@@ -471,6 +472,27 @@ export default function App() {
               setIsCustomerModalOpen(true);
             }}
             onDelete={handleDeleteCustomer}
+            onCreateInquiryForCustomer={(customer) => {
+              setInquiryToEdit({
+                id: '',
+                inquiryNumber: '',
+                date: new Date().toISOString().split('T')[0],
+                customerName: customer.name,
+                customerContact: customer.whatsapp || customer.contactEmail || customer.contactPhone || '',
+                wechatId: customer.wechatId || '',
+                country: customer.country || 'United States',
+                product: '',
+                quantity: 500,
+                price1688Rmb: 0,
+                marginPercent: 25,
+                clientUnitPriceUsd: 0,
+                totalQuotationUsd: 0,
+                estimatedProfitUsd: 0,
+                orderStatus: 'New Inquiry',
+                updatedAt: new Date().toISOString(),
+              });
+              setIsInquiryModalOpen(true);
+            }}
           />
         )}
       </main>

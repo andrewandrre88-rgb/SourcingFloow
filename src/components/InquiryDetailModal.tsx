@@ -28,6 +28,7 @@ import {
   Target,
   AlertCircle,
   Clock,
+  MessageCircle,
 } from 'lucide-react';
 import { InquiryItem, OrderStatus } from '../types';
 import {
@@ -40,6 +41,7 @@ import {
   calculatePackagingDetails,
 } from '../lib/currency';
 import { detectB2BPlatform } from '../lib/b2bPlatforms';
+import { getCountryFlag, cleanPhoneNumber, getWhatsAppWebUrl } from '../lib/countryFlags';
 
 interface InquiryDetailModalProps {
   isOpen: boolean;
@@ -306,31 +308,50 @@ export const InquiryDetailModal: React.FC<InquiryDetailModalProps> = ({
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-bold text-slate-900">{item.customerName}</span>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-white border border-slate-200 text-slate-700 shadow-2xs">
-                      <Globe className="w-3 h-3 mr-1 text-slate-400" />
-                      {item.country || 'Global'}
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-semibold bg-white border border-slate-200 text-slate-700 shadow-2xs">
+                      <span className="text-sm leading-none">{getCountryFlag(item.country)}</span>
+                      <span>{item.country || 'Global'}</span>
                     </span>
                   </div>
 
-                  {item.customerContact && (
-                    <div className="flex items-center justify-between text-slate-600 bg-white p-2 rounded border border-slate-200/70">
-                      <span className="flex items-center gap-1.5 font-medium">
-                        <Phone className="w-3 h-3 text-slate-400" />
-                        {item.customerContact}
-                      </span>
-                      <button
-                        onClick={() => copyToClipboard(item.customerContact || '', 'contact')}
-                        className="text-slate-400 hover:text-indigo-600 p-0.5 rounded transition"
-                        title="Copy contact"
-                      >
-                        {copiedField === 'contact' ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-600" />
-                        ) : (
-                          <Copy className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                    </div>
-                  )}
+                  {item.customerContact && (() => {
+                    const clean = cleanPhoneNumber(item.customerContact);
+                    const waWebUrl = clean ? getWhatsAppWebUrl(item.customerContact, `Hello ${item.customerName}, regarding inquiry ${item.inquiryNumber} for ${item.product}:`) : null;
+
+                    return (
+                      <div className="flex items-center justify-between text-slate-600 bg-white p-2 rounded border border-slate-200/70">
+                        <div className="flex items-center gap-2">
+                          <span className="flex items-center gap-1.5 font-medium text-xs">
+                            <Phone className="w-3 h-3 text-slate-400" />
+                            {item.customerContact}
+                          </span>
+                          {waWebUrl && (
+                            <a
+                              href={waWebUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-2xs"
+                              title="Chat / Call via WhatsApp Web directly"
+                            >
+                              <MessageCircle className="w-3 h-3" />
+                              <span>WhatsApp Web</span>
+                            </a>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => copyToClipboard(item.customerContact || '', 'contact')}
+                          className="text-slate-400 hover:text-indigo-600 p-0.5 rounded transition"
+                          title="Copy contact"
+                        >
+                          {copiedField === 'contact' ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })()}
 
                   {item.wechatId && (
                     <div className="flex items-center justify-between text-slate-600 bg-white p-2 rounded border border-slate-200/70">

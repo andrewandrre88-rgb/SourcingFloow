@@ -114,13 +114,18 @@ export interface SheetSyncState {
 
 export interface Customer {
   id: string; // Unique ID
-  name: string; // Company or Contact Name
+  name: string; // Contact or Company Name
+  company?: string; // Company / Business Name
   contactEmail?: string;
   contactPhone?: string;
-  whatsapp?: string;
+  whatsapp?: string; // WhatsApp number
   wechatId?: string;
-  country?: string;
-  type: 'Active' | 'Potential' | 'Past';
+  country?: string; // Country Name
+  type: 'Active' | 'Potential' | 'VIP' | 'Past';
+  preferredCurrency?: 'USD' | 'EUR' | 'GBP' | 'RMB';
+  destinationPort?: string; // Port of discharge e.g., Los Angeles, Hamburg, Jebel Ali
+  shippingAddress?: string;
+  website?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;

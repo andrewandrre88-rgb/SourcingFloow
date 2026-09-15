@@ -57,6 +57,7 @@ import {
 } from '../lib/currency';
 import { compressImageFile } from '../lib/imageUtils';
 import { detectB2BPlatform, CHINESE_B2B_PLATFORMS } from '../lib/b2bPlatforms';
+import { COUNTRIES } from '../lib/countryFlags';
 
 interface InquiryModalProps {
   isOpen: boolean;
@@ -67,24 +68,7 @@ interface InquiryModalProps {
   existingCount: number;
 }
 
-const COMMON_COUNTRIES = [
-  'United States',
-  'United Kingdom',
-  'Canada',
-  'Australia',
-  'Germany',
-  'France',
-  'Mexico',
-  'Brazil',
-  'Saudi Arabia',
-  'UAE',
-  'Spain',
-  'Italy',
-  'Netherlands',
-  'Japan',
-  'Singapore',
-  'South Africa',
-];
+const COMMON_COUNTRIES = COUNTRIES.map((c) => c.name);
 
 const HELPER_ROLES = [
   'Sourcing Assistant',
