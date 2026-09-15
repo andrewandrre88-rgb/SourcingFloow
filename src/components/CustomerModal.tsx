@@ -28,6 +28,7 @@ import {
   getWhatsAppUniversalUrl,
   DEFAULT_WHATSAPP_MESSAGE,
 } from '../lib/countryFlags';
+import { SearchableCountrySelect } from './SearchableCountrySelect';
 
 interface CustomerModalProps {
   isOpen: boolean;
@@ -227,7 +228,7 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
               </select>
             </div>
 
-            {/* Country with Flag Picker */}
+            {/* Country with Flag Picker & Search */}
             <div>
               <label className="block text-[11px] font-semibold text-slate-700 mb-1 flex items-center justify-between">
                 <span>Destination Country</span>
@@ -236,20 +237,11 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
                   <span>{currentCountry?.dialCode || ''}</span>
                 </span>
               </label>
-              <div className="relative">
-                <select
-                  id="client-country-select"
-                  value={formData.country || 'United States'}
-                  onChange={(e) => handleCountrySelect(e.target.value)}
-                  className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-md text-xs text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-medium shadow-2xs cursor-pointer"
-                >
-                  {COUNTRIES.map((c) => (
-                    <option key={c.code} value={c.name}>
-                      {c.flag} {c.name} ({c.dialCode})
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <SearchableCountrySelect
+                id="client-country-select"
+                value={formData.country || 'United States'}
+                onChange={handleCountrySelect}
+              />
             </div>
           </div>
 
