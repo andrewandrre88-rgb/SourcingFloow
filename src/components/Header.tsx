@@ -28,8 +28,8 @@ interface HeaderProps {
   onOpenNewModal: () => void;
   onOpenRatesModal: () => void;
   isLoggingIn: boolean;
-  currentView: 'inquiries' | 'customers';
-  onViewChange: (view: 'inquiries' | 'customers') => void;
+  currentView: 'inquiries' | 'customers' | 'services';
+  onViewChange: (view: 'inquiries' | 'customers' | 'services') => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -175,39 +175,47 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             </div>
 
-            {/* Bottom Row: View Switcher (Inquiries / Customers) & Currency Toggle */}
-            <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
+            {/* Bottom Row: View Switcher (Inquiries / Customers / Services) & Currency Toggle */}
+            <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-100">
               {/* View Switcher */}
-              {user ? (
-                <div className="flex-1 grid grid-cols-2 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs font-semibold">
-                  <button
-                    type="button"
-                    id="header-mobile-view-inquiries-btn"
-                    onClick={() => onViewChange('inquiries')}
-                    className={`py-1.5 px-2 rounded-md text-xs font-semibold transition text-center ${
-                      currentView === 'inquiries'
-                        ? 'bg-white text-indigo-700 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Inquiries
-                  </button>
-                  <button
-                    type="button"
-                    id="header-mobile-view-customers-btn"
-                    onClick={() => onViewChange('customers')}
-                    className={`py-1.5 px-2 rounded-md text-xs font-semibold transition text-center ${
-                      currentView === 'customers'
-                        ? 'bg-white text-indigo-700 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Customers
-                  </button>
-                </div>
-              ) : (
-                <div className="flex-1" />
-              )}
+              <div className="flex-1 grid grid-cols-4 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs font-semibold">
+                <button
+                  type="button"
+                  id="header-mobile-view-inquiries-btn"
+                  onClick={() => onViewChange('inquiries')}
+                  className={`py-1.5 px-1 rounded-md text-[11px] sm:text-xs font-semibold transition text-center truncate ${
+                    currentView === 'inquiries'
+                      ? 'bg-white text-indigo-700 shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Inquiries
+                </button>
+                <button
+                  type="button"
+                  id="header-mobile-view-customers-btn"
+                  onClick={() => onViewChange('customers')}
+                  className={`py-1.5 px-1 rounded-md text-[11px] sm:text-xs font-semibold transition text-center truncate ${
+                    currentView === 'customers'
+                      ? 'bg-white text-indigo-700 shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Clients
+                </button>
+                <button
+                  type="button"
+                  id="header-mobile-view-services-btn"
+                  onClick={() => onViewChange('services')}
+                  className={`py-1.5 px-1 rounded-md text-[11px] sm:text-xs font-semibold transition text-center truncate ${
+                    currentView === 'services'
+                      ? 'bg-white text-indigo-700 shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Services
+                </button>
+              </div>
 
               {/* Currency View Toggle */}
               <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs shrink-0 shadow-2xs">
@@ -215,7 +223,7 @@ export const Header: React.FC<HeaderProps> = ({
                   type="button"
                   id="header-mobile-currency-usd-btn"
                   onClick={() => onCurrencyViewChange('USD')}
-                  className={`px-2.5 py-1.5 rounded-md text-[11px] font-bold transition ${
+                  className={`px-2 py-1 sm:py-1.5 rounded-md text-[11px] font-bold transition ${
                     currencyView === 'USD'
                       ? 'bg-white text-indigo-700 shadow-xs'
                       : 'text-slate-600 hover:text-slate-900'
@@ -228,7 +236,7 @@ export const Header: React.FC<HeaderProps> = ({
                   type="button"
                   id="header-mobile-currency-rmb-btn"
                   onClick={() => onCurrencyViewChange('RMB')}
-                  className={`px-2.5 py-1.5 rounded-md text-[11px] font-bold transition ${
+                  className={`px-2 py-1 sm:py-1.5 rounded-md text-[11px] font-bold transition ${
                     currencyView === 'RMB'
                       ? 'bg-white text-emerald-700 shadow-xs'
                       : 'text-slate-600 hover:text-slate-900'
@@ -241,7 +249,7 @@ export const Header: React.FC<HeaderProps> = ({
                   type="button"
                   id="header-mobile-currency-dual-btn"
                   onClick={() => onCurrencyViewChange('DUAL')}
-                  className={`px-2.5 py-1.5 rounded-md text-[11px] font-bold transition ${
+                  className={`px-2 py-1 sm:py-1.5 rounded-md text-[11px] font-bold transition ${
                     currencyView === 'DUAL'
                       ? 'bg-white text-indigo-700 shadow-xs'
                       : 'text-slate-600 hover:text-slate-900'
@@ -269,34 +277,44 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
               </div>
 
-              {user && (
-                <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0">
-                  <button
-                    type="button"
-                    id="header-view-inquiries-btn"
-                    onClick={() => onViewChange('inquiries')}
-                    className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs font-semibold transition ${
-                      currentView === 'inquiries'
-                        ? 'bg-white text-indigo-700 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Inquiries
-                  </button>
-                  <button
-                    type="button"
-                    id="header-view-customers-btn"
-                    onClick={() => onViewChange('customers')}
-                    className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs font-semibold transition ${
-                      currentView === 'customers'
-                        ? 'bg-white text-indigo-700 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Customers
-                  </button>
-                </div>
-              )}
+              <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0">
+                <button
+                  type="button"
+                  id="header-view-inquiries-btn"
+                  onClick={() => onViewChange('inquiries')}
+                  className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs font-semibold transition ${
+                    currentView === 'inquiries'
+                      ? 'bg-white text-indigo-700 shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Inquiries
+                </button>
+                <button
+                  type="button"
+                  id="header-view-customers-btn"
+                  onClick={() => onViewChange('customers')}
+                  className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs font-semibold transition ${
+                    currentView === 'customers'
+                      ? 'bg-white text-indigo-700 shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Customers
+                </button>
+                <button
+                  type="button"
+                  id="header-view-services-btn"
+                  onClick={() => onViewChange('services')}
+                  className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs font-semibold transition ${
+                    currentView === 'services'
+                      ? 'bg-white text-indigo-700 shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Services
+                </button>
+              </div>
             </div>
 
             <div className="flex items-center space-x-1.5 sm:space-x-2.5 lg:space-x-3 shrink-0">
@@ -404,7 +422,13 @@ export const Header: React.FC<HeaderProps> = ({
                 className="flex items-center space-x-1 px-3 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-xs transition active:scale-95"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">{currentView === 'inquiries' ? 'New Inquiry' : 'New Customer'}</span>
+                <span className="hidden md:inline">
+                  {currentView === 'inquiries'
+                    ? 'New Inquiry'
+                    : currentView === 'customers'
+                    ? 'New Customer'
+                    : 'New Service'}
+                </span>
                 <span className="md:hidden">New</span>
               </button>
 

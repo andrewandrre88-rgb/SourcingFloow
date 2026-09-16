@@ -29,6 +29,9 @@ import {
   AlertCircle,
   Clock,
   MessageCircle,
+  Receipt,
+  CreditCard,
+  Tag,
 } from 'lucide-react';
 import { InquiryItem, OrderStatus } from '../types';
 import {
@@ -38,6 +41,7 @@ import {
   formatDualTotal,
   calculateHelperCommissionAmount,
   calculateTotalHelperCommissions,
+  calculateTotalInquiryExpenses,
   calculatePackagingDetails,
 } from '../lib/currency';
 import { detectB2BPlatform } from '../lib/b2bPlatforms';
@@ -105,7 +109,12 @@ export const InquiryDetailModal: React.FC<InquiryDetailModalProps> = ({
     item.estimatedProfitUsd || 0,
     item.quantity || 1
   );
-  const netAgentProfit = Number(((item.estimatedProfitUsd || 0) - totalHelpersCommission).toFixed(2));
+
+  const totalInquiryExpenses = calculateTotalInquiryExpenses(item.inquiryExpenses, rate);
+
+  const netAgentProfit = Number(
+    ((item.estimatedProfitUsd || 0) - totalHelpersCommission - totalInquiryExpenses.totalUsd).toFixed(2)
+  );
 
   const packaging = calculatePackagingDetails({
     quantity: item.quantity || 1,
@@ -686,7 +695,7 @@ export const InquiryDetailModal: React.FC<InquiryDetailModalProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 text-xs">
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs">
                 {totalHelpersCommission > 0 && (
                   <div className="text-left sm:text-right">
                     <span className="text-amber-300 text-[11px] block">Collaborators Payout:</span>
@@ -699,9 +708,21 @@ export const InquiryDetailModal: React.FC<InquiryDetailModalProps> = ({
                   </div>
                 )}
 
+                {totalInquiryExpenses.totalUsd > 0 && (
+                  <div className="text-left sm:text-right pl-3 border-l border-slate-700">
+                    <span className="text-rose-300 text-[11px] block">Inquiry Expenses:</span>
+                    <div className="text-sm font-bold text-rose-300 font-mono">
+                      -{formatCurrency(totalInquiryExpenses.totalUsd, 'USD')}{' '}
+                      <span className="text-[10px] font-normal text-rose-300/80">
+                        (-¥{formatCurrency(totalInquiryExpenses.totalRmb, 'RMB')})
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 <div className="text-left sm:text-right pl-3 border-l border-slate-700">
                   <span className="text-emerald-400 text-[11px] block">
-                    {totalHelpersCommission > 0 ? 'Your Net Profit:' : 'Total Net Profit:'}
+                    {totalHelpersCommission > 0 || totalInquiryExpenses.totalUsd > 0 ? 'Your Net Profit:' : 'Total Net Profit:'}
                   </span>
                   <div className="text-base font-bold text-emerald-400 font-mono">
                     +{formatCurrency(netAgentProfit, 'USD')}{' '}
@@ -713,6 +734,78 @@ export const InquiryDetailModal: React.FC<InquiryDetailModalProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Inquiry Out-of-Pocket Expenses Section (if any exist) */}
+          {item.inquiryExpenses && item.inquiryExpenses.length > 0 && (
+            <div className="border border-slate-200 rounded-lg overflow-hidden">
+              <div className="px-4 py-2.5 bg-slate-100/80 border-b border-slate-200 font-bold text-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5">
+                  <Receipt className="w-4 h-4 text-emerald-600" />
+                  Inquiry Out-of-Pocket Expenses ({item.inquiryExpenses.length})
+                </span>
+                <span className="text-xs font-bold font-mono text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full self-start sm:self-auto">
+                  Total Expenses: -{formatCurrency(totalInquiryExpenses.totalUsd, 'USD')} (-¥{formatCurrency(totalInquiryExpenses.totalRmb, 'RMB')})
+                </span>
+              </div>
+
+              <div className="divide-y divide-slate-100 bg-white">
+                {item.inquiryExpenses.map((expense, idx) => {
+                  const amtUsd = expense.currency === 'RMB' ? expense.amount / rate : expense.amount;
+                  const amtRmb = expense.currency === 'RMB' ? expense.amount : expense.amount * rate;
+
+                  return (
+                    <div
+                      key={expense.id || idx}
+                      className="p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:bg-slate-50 transition"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="w-7 h-7 rounded-full bg-emerald-50 text-emerald-700 font-bold text-xs flex items-center justify-center border border-emerald-200 shrink-0">
+                          {idx + 1}
+                        </span>
+                        <div>
+                          <div className="font-semibold text-slate-900 text-xs flex items-center gap-2">
+                            <span>{expense.title || expense.category || 'Out-of-Pocket Expense'}</span>
+                            {expense.hasFapiao && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                                发票 Fapiao
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-2 mt-0.5">
+                            {expense.supplierOrPayee && (
+                              <span className="text-slate-600 font-medium">Payee: {expense.supplierOrPayee}</span>
+                            )}
+                            {expense.paymentMethod && (
+                              <span className="text-slate-500">Method: {expense.paymentMethod}</span>
+                            )}
+                            {expense.date && (
+                              <span className="text-slate-400">Date: {expense.date}</span>
+                            )}
+                            {expense.notes && (
+                              <span className="text-slate-400 italic">Note: {expense.notes}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-right sm:self-center pl-10 sm:pl-0">
+                        <div className="text-xs font-bold font-mono text-rose-600">
+                          -{formatCurrency(amtUsd, 'USD')}{' '}
+                          <span className="text-[10px] font-normal text-slate-400">
+                            (-¥{formatCurrency(amtRmb, 'RMB')})
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-mono">
+                          Recorded: {expense.currency === 'RMB' ? `¥${expense.amount}` : `$${expense.amount}`}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Collaborator & Helper Commissions Section (if any exist) */}
           {item.helperCommissions && item.helperCommissions.length > 0 && (

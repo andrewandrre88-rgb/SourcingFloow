@@ -263,6 +263,204 @@
           "required": true
         }
       }
+    },
+    "ServiceRequest": {
+      "collection": "users/{userId}/services",
+      "path": "/users/{userId}/services/{serviceId}",
+      "description": "China on-ground non-sourcing requests (clinics, company registration, translation, audits, legal)",
+      "fields": {
+        "id": {
+          "type": "string",
+          "required": true
+        },
+        "serviceNumber": {
+          "type": "string",
+          "required": true
+        },
+        "date": {
+          "type": "string",
+          "required": true
+        },
+        "clientName": {
+          "type": "string",
+          "required": true
+        },
+        "clientContact": {
+          "type": "string",
+          "required": false
+        },
+        "wechatId": {
+          "type": "string",
+          "required": false
+        },
+        "country": {
+          "type": "string",
+          "required": false
+        },
+        "category": {
+          "type": "string",
+          "required": true
+        },
+        "title": {
+          "type": "string",
+          "required": true
+        },
+        "description": {
+          "type": "string",
+          "required": true
+        },
+        "cityLocation": {
+          "type": "string",
+          "required": false
+        },
+        "status": {
+          "type": "string",
+          "required": true
+        },
+        "priority": {
+          "type": "string",
+          "required": true
+        },
+        "quoteCurrency": {
+          "type": "string",
+          "required": true
+        },
+        "clientFee": {
+          "type": "number",
+          "required": true
+        },
+        "estimatedCost": {
+          "type": "number",
+          "required": true
+        },
+        "estimatedProfitUsd": {
+          "type": "number",
+          "required": true
+        },
+        "estimatedProfitRmb": {
+          "type": "number",
+          "required": true
+        },
+        "paymentStatus": {
+          "type": "string",
+          "required": true
+        },
+        "assignedPartner": {
+          "type": "string",
+          "required": false
+        },
+        "partnerContact": {
+          "type": "string",
+          "required": false
+        },
+        "partnerCommission": {
+          "type": "number",
+          "required": false
+        },
+        "targetDate": {
+          "type": "string",
+          "required": false
+        },
+        "notes": {
+          "type": "string",
+          "required": false
+        },
+        "createdAt": {
+          "type": "string",
+          "required": true
+        },
+        "updatedAt": {
+          "type": "string",
+          "required": true
+        }
+      }
+    },
+    "Expense": {
+      "collection": "users/{userId}/expenses",
+      "path": "/users/{userId}/expenses/{expenseId}",
+      "description": "Business travel, transport, hotel, food, and factory relocation expenses across China",
+      "fields": {
+        "id": {
+          "type": "string",
+          "required": true
+        },
+        "expenseNumber": {
+          "type": "string",
+          "required": true
+        },
+        "date": {
+          "type": "string",
+          "required": true
+        },
+        "category": {
+          "type": "string",
+          "required": true
+        },
+        "subType": {
+          "type": "string",
+          "required": false
+        },
+        "title": {
+          "type": "string",
+          "required": true
+        },
+        "amount": {
+          "type": "number",
+          "required": true
+        },
+        "currency": {
+          "type": "string",
+          "required": true
+        },
+        "amountRmb": {
+          "type": "number",
+          "required": true
+        },
+        "amountUsd": {
+          "type": "number",
+          "required": true
+        },
+        "city": {
+          "type": "string",
+          "required": true
+        },
+        "destinationRoute": {
+          "type": "string",
+          "required": false
+        },
+        "factoryOrPartner": {
+          "type": "string",
+          "required": false
+        },
+        "hasFapiao": {
+          "type": "boolean",
+          "required": false
+        },
+        "paymentMethod": {
+          "type": "string",
+          "required": false
+        },
+        "linkedServiceId": {
+          "type": "string",
+          "required": false
+        },
+        "linkedInquiryId": {
+          "type": "string",
+          "required": false
+        },
+        "notes": {
+          "type": "string",
+          "required": false
+        },
+        "createdAt": {
+          "type": "string",
+          "required": true
+        },
+        "updatedAt": {
+          "type": "string",
+          "required": true
+        }
+      }
     }
   },
   "securityRules": {

@@ -33,6 +33,12 @@ import {
   Check,
   Clock,
   Zap,
+  Receipt,
+  CreditCard,
+  Tag,
+  Train,
+  Car,
+  ShieldCheck,
 } from 'lucide-react';
 import {
   InquiryItem,
@@ -43,6 +49,9 @@ import {
   HelperCommissionType,
   CurrencyUnit,
   MarginMode,
+  InquiryExpense,
+  InquiryExpenseCategory,
+  ExpensePaymentMethod,
 } from '../types';
 import {
   calculateInquiryPricing,
@@ -53,6 +62,7 @@ import {
   calculateHelperCommissionAmount,
   calculateTotalHelperCommissions,
   calculatePackagingDetails,
+  calculateTotalInquiryExpenses,
   convertRmbToUsd,
   convertUsdToRmb,
 } from '../lib/currency';
@@ -187,6 +197,7 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
         quotes: initialQuotes,
         selectedQuoteId: inquiryToEdit.selectedQuoteId || (initialQuotes.length > 0 ? initialQuotes[0].id : ''),
         helperCommissions: inquiryToEdit.helperCommissions || [],
+        inquiryExpenses: inquiryToEdit.inquiryExpenses || [],
       });
       if (inquiryToEdit.targetPriceRmb && !inquiryToEdit.targetPriceUsd) {
         setTargetPriceCurrency('RMB');
@@ -262,6 +273,7 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
         marginFixedUsd: 0,
         marginDealTotal: undefined,
         helperCommissions: [],
+        inquiryExpenses: [],
         orderStatus: 'New Inquiry',
         notes: '',
         updatedAt: new Date().toISOString(),
@@ -307,7 +319,16 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
     Number(formData.quantity) || 1,
     exchangeRates.USD_TO_RMB
   );
-  const netAgentProfit = Number((pricing.estimatedProfitUsd - totalHelperCommission).toFixed(2));
+
+  const totalInquiryExpenses = calculateTotalInquiryExpenses(
+    formData.inquiryExpenses,
+    exchangeRates.USD_TO_RMB
+  );
+
+  // Net Take-Home = Gross Profit - Helper Commissions - Inquiry Expenses
+  const netAgentProfit = Number(
+    (pricing.estimatedProfitUsd - totalHelperCommission - totalInquiryExpenses.totalUsd).toFixed(2)
+  );
 
   // Helper to sanitize numeric inputs entered with symbols like $, ¥, €, commas, or spaces
   const cleanCurrencyInput = (raw: string): string => {
@@ -712,6 +733,57 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
     setFormData((prev) => ({ ...prev, helperCommissions: updated }));
   };
 
+  const handleAddExpense = (preset?: Partial<InquiryExpense>) => {
+    const rate = exchangeRates.USD_TO_RMB > 0 ? exchangeRates.USD_TO_RMB : 7.25;
+    const curr: CurrencyUnit = preset?.currency || (activeCurrencyMode === 'RMB' ? 'RMB' : 'USD');
+    const amt = preset?.amount || 0;
+    const amtUsd = curr === 'RMB' ? Number((amt / rate).toFixed(2)) : amt;
+    const amtRmb = curr === 'RMB' ? amt : Number((amt * rate).toFixed(2));
+
+    const newExpense: InquiryExpense = {
+      id: `exp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      category: preset?.category,
+      title: preset?.title || '',
+      amount: amt,
+      currency: curr,
+      amountUsd: amtUsd,
+      amountRmb: amtRmb,
+      date: preset?.date || new Date().toISOString().split('T')[0],
+      supplierOrPayee: preset?.supplierOrPayee || '',
+      paymentMethod: preset?.paymentMethod || 'WeChat Pay',
+      hasFapiao: preset?.hasFapiao ?? true,
+      notes: preset?.notes || '',
+    };
+    setFormData((prev) => ({
+      ...prev,
+      inquiryExpenses: [...(prev.inquiryExpenses || []), newExpense],
+    }));
+  };
+
+  const handleUpdateExpense = (index: number, updates: Partial<InquiryExpense>) => {
+    const rate = exchangeRates.USD_TO_RMB > 0 ? exchangeRates.USD_TO_RMB : 7.25;
+    const updated = [...(formData.inquiryExpenses || [])];
+    const current = { ...updated[index], ...updates };
+
+    const amt = Number(current.amount) || 0;
+    if (current.currency === 'RMB') {
+      current.amountRmb = amt;
+      current.amountUsd = Number((amt / rate).toFixed(2));
+    } else {
+      current.amountUsd = amt;
+      current.amountRmb = Number((amt * rate).toFixed(2));
+    }
+
+    updated[index] = current;
+    setFormData((prev) => ({ ...prev, inquiryExpenses: updated }));
+  };
+
+  const handleRemoveExpense = (index: number) => {
+    const updated = [...(formData.inquiryExpenses || [])];
+    updated.splice(index, 1);
+    setFormData((prev) => ({ ...prev, inquiryExpenses: updated }));
+  };
+
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -821,6 +893,10 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
       helperCommissions: formData.helperCommissions || [],
       totalHelperCommissionUsd: totalHelperCommission,
       netAgentProfitUsd: netAgentProfit,
+      inquiryExpenses: formData.inquiryExpenses || [],
+      totalExpensesUsd: totalInquiryExpenses.totalUsd,
+      totalExpensesRmb: totalInquiryExpenses.totalRmb,
+      netProfitAfterExpensesUsd: netAgentProfit,
       orderStatus: (formData.orderStatus as OrderStatus) || 'New Inquiry',
       notes: formData.notes?.trim() || '',
       updatedAt: new Date().toISOString(),
@@ -830,8 +906,8 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-white border border-slate-200 rounded-lg max-w-3xl w-full shadow-xl overflow-hidden my-6 animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-white border border-slate-200 rounded-xl max-w-3xl xl:max-w-4xl w-full shadow-2xl overflow-hidden my-3 sm:my-6 animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[94vh]">
         {/* Modal Header */}
         <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50">
           <div className="flex items-center space-x-2.5">
@@ -905,7 +981,7 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
         </div>
 
         {/* Modal Form */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-3.5 sm:p-5 space-y-4 overflow-y-auto flex-1">
           {/* Top Row: Inquiry #, Date, Status */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
@@ -2693,45 +2769,6 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
                     </div>
                   );
                 })}
-
-                {/* Net Agent Take-Home Profit Breakdown */}
-                <div className="bg-slate-900 text-white rounded-lg p-3 grid grid-cols-1 sm:grid-cols-3 gap-3 text-center shadow-xs">
-                  <div>
-                    <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
-                      Gross Sourcing Margin
-                    </div>
-                    <div className="text-sm font-bold font-mono text-white mt-0.5">
-                      +{formatCurrency(pricing.estimatedProfitUsd, 'USD')}
-                    </div>
-                    <div className="text-[10px] font-mono text-slate-400">
-                      (+¥{formatCurrency(pricing.estimatedProfitRmb, 'RMB')})
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="text-[10px] text-amber-400 uppercase font-bold tracking-wider">
-                      Total Helper Payouts ({formData.helperCommissions.length})
-                    </div>
-                    <div className="text-sm font-bold font-mono text-amber-400 mt-0.5">
-                      -{formatCurrency(totalHelperCommission, 'USD')}
-                    </div>
-                    <div className="text-[10px] font-mono text-amber-400/80">
-                      (-¥{formatCurrency(totalHelperCommission * exchangeRates.USD_TO_RMB, 'RMB')})
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-800/90 rounded-md p-1.5 border border-slate-700">
-                    <div className="text-[10px] text-emerald-400 uppercase font-bold tracking-wider">
-                      Your Net Take-Home Profit
-                    </div>
-                    <div className="text-base font-bold font-mono text-emerald-400 mt-0.5">
-                      +{formatCurrency(netAgentProfit, 'USD')}
-                    </div>
-                    <div className="text-[10px] font-mono text-emerald-400/80">
-                      (+¥{formatCurrency(netAgentProfit * exchangeRates.USD_TO_RMB, 'RMB')})
-                    </div>
-                  </div>
-                </div>
               </div>
             ) : (
               <div className="text-center py-3.5 border border-dashed border-slate-300 rounded-lg bg-white">
@@ -2742,6 +2779,370 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
                 </p>
               </div>
             )}
+          </div>
+
+          {/* Section 6: Inquiry Out-of-Pocket Expenses & Operational Costs */}
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 sm:p-4 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-[11px] uppercase font-bold tracking-wider text-slate-700 flex items-center gap-1.5">
+                  <Receipt className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Inquiry Out-of-Pocket Expenses & Direct Costs</span>
+                </h3>
+                {formData.inquiryExpenses && formData.inquiryExpenses.length > 0 ? (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1 font-mono">
+                    <Coins className="w-3 h-3 text-emerald-600" />
+                    {formData.inquiryExpenses.length} {formData.inquiryExpenses.length === 1 ? 'Cost' : 'Costs'} • {formatCurrency(totalInquiryExpenses.totalUsd, 'USD')} (¥{formatCurrency(totalInquiryExpenses.totalRmb, 'RMB')})
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    (Sample costs, SF Express, factory travel Gaotie, QC inspection)
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  id="modal-add-custom-expense-btn"
+                  onClick={() => handleAddExpense()}
+                  className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 bg-white hover:bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-md transition flex items-center gap-1.5 shadow-xs shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>+ Add Expense</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Expense Preset Buttons */}
+            <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider shrink-0">Quick Presets:</span>
+              <button
+                type="button"
+                onClick={() =>
+                  handleAddExpense({
+                    title: '1688 Golden Sample Purchase',
+                    amount: 150,
+                    currency: 'RMB',
+                    supplierOrPayee: selectedQuote?.supplierName || '1688 Factory',
+                    paymentMethod: 'WeChat Pay',
+                    hasFapiao: true,
+                  })
+                }
+                className="px-2.5 py-1 rounded text-[11px] font-medium bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 transition shadow-2xs"
+              >
+                + 1688 Sample (¥150)
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  handleAddExpense({
+                    title: 'SF Express Overnight Delivery to Office',
+                    amount: 50,
+                    currency: 'RMB',
+                    supplierOrPayee: 'SF Express (顺丰速运)',
+                    paymentMethod: 'Alipay',
+                    hasFapiao: true,
+                  })
+                }
+                className="px-2.5 py-1 rounded text-[11px] font-medium bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 transition shadow-2xs"
+              >
+                + SF Express (¥50)
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  handleAddExpense({
+                    title: 'High-Speed Rail Gaotie Ticket',
+                    amount: 260,
+                    currency: 'RMB',
+                    supplierOrPayee: 'China Railway (12306)',
+                    paymentMethod: 'Alipay',
+                    hasFapiao: true,
+                    notes: 'Roundtrip factory audit trip',
+                  })
+                }
+                className="px-2.5 py-1 rounded text-[11px] font-medium bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 transition shadow-2xs"
+              >
+                + Gaotie Train (¥260)
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  handleAddExpense({
+                    title: 'Didi Taxi to Factory Park',
+                    amount: 80,
+                    currency: 'RMB',
+                    supplierOrPayee: 'Didi Chuxing (滴滴出行)',
+                    paymentMethod: 'WeChat Pay',
+                    hasFapiao: true,
+                  })
+                }
+                className="px-2.5 py-1 rounded text-[11px] font-medium bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 transition shadow-2xs"
+              >
+                + Didi Taxi (¥80)
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  handleAddExpense({
+                    title: 'On-site Factory QC & Batch Inspection',
+                    amount: 600,
+                    currency: 'RMB',
+                    supplierOrPayee: 'Third-party QC Inspector',
+                    paymentMethod: 'Bank Transfer',
+                    hasFapiao: true,
+                  })
+                }
+                className="px-2.5 py-1 rounded text-[11px] font-medium bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 transition shadow-2xs"
+              >
+                + QC Inspection (¥600)
+              </button>
+            </div>
+
+            {formData.inquiryExpenses && formData.inquiryExpenses.length > 0 ? (
+              <div className="space-y-3">
+                {formData.inquiryExpenses.map((expense, idx) => {
+                  const rate = exchangeRates.USD_TO_RMB > 0 ? exchangeRates.USD_TO_RMB : 7.25;
+                  const amt = Number(expense.amount) || 0;
+                  const amtUsd = expense.currency === 'RMB' ? amt / rate : amt;
+                  const amtRmb = expense.currency === 'RMB' ? amt : amt * rate;
+
+                  return (
+                    <div
+                      key={expense.id || idx}
+                      className="p-3 sm:p-3.5 bg-white border border-slate-200 rounded-lg shadow-xs space-y-3 transition hover:border-slate-300"
+                    >
+                      {/* Top row: Custom Expense Title, Amount, Currency, Trash */}
+                      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2.5 border-b border-slate-100 pb-2.5">
+                        {/* Title input and index number */}
+                        <div className="flex items-center gap-2 w-full md:flex-1 min-w-0">
+                          <span className="w-5 h-5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[10px] flex items-center justify-center border border-emerald-200 shrink-0">
+                            {idx + 1}
+                          </span>
+
+                          {/* Custom Expense Title / What this expense is about */}
+                          <div className="relative flex-1 min-w-0">
+                            <input
+                              type="text"
+                              id={`expense-title-input-${idx}`}
+                              placeholder="What is this expense for? (e.g. 1688 Sample, SF Express, Factory visit, QC...)"
+                              value={expense.title}
+                              onChange={(e) => handleUpdateExpense(idx, { title: e.target.value })}
+                              className="w-full px-2.5 py-1.5 bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-md text-xs font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Amount & Currency & Trash */}
+                        <div className="flex flex-wrap sm:flex-nowrap items-center justify-between md:justify-end gap-2 w-full md:w-auto shrink-0 pt-1 md:pt-0">
+                          <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
+                            {/* Currency toggle */}
+                            <div className="inline-flex rounded-md bg-slate-200 p-0.5 text-[10px] font-bold shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateExpense(idx, { currency: 'RMB' })}
+                                className={`px-2 py-1 rounded transition ${
+                                  expense.currency === 'RMB'
+                                    ? 'bg-white text-emerald-700 shadow-2xs font-bold'
+                                    : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                              >
+                                ¥ RMB
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateExpense(idx, { currency: 'USD' })}
+                                className={`px-2 py-1 rounded transition ${
+                                  expense.currency === 'USD'
+                                    ? 'bg-white text-indigo-700 shadow-2xs font-bold'
+                                    : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                              >
+                                $ USD
+                              </button>
+                            </div>
+
+                            {/* Amount input */}
+                            <div className="relative w-28 sm:w-24 shrink-0">
+                              <span className="absolute left-2 top-1.5 text-slate-400 text-xs font-bold">
+                                {expense.currency === 'RMB' ? '¥' : '$'}
+                              </span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="any"
+                                placeholder="0.00"
+                                value={expense.amount ?? ''}
+                                onChange={(e) =>
+                                  handleUpdateExpense(idx, { amount: parseFloat(e.target.value) || 0 })
+                                }
+                                className="w-full pl-5 pr-2 py-1 bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                              />
+                            </div>
+
+                            {/* Live dual conversion display */}
+                            <div className="text-right px-1 shrink-0">
+                              <span className="text-[11px] text-slate-500 font-mono block font-medium">
+                                {expense.currency === 'RMB'
+                                  ? `≈ $${amtUsd.toFixed(2)}`
+                                  : `≈ ¥${amtRmb.toFixed(2)}`}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Delete button */}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveExpense(idx)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition shrink-0 ml-1"
+                            title="Remove this expense"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Sub-row: Payee, Date, Payment Method, Note, Fapiao */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-12 gap-2.5 text-xs">
+                        {/* Payee / Supplier */}
+                        <div className="sm:col-span-1 md:col-span-1 lg:col-span-3">
+                          <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                            Payee / Supplier
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. SF Express, 1688 Factory"
+                            value={expense.supplierOrPayee || ''}
+                            onChange={(e) => handleUpdateExpense(idx, { supplierOrPayee: e.target.value })}
+                            className="w-full px-2.5 py-1.5 bg-slate-50/80 hover:bg-white focus:bg-white border border-slate-200 rounded text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 placeholder:text-slate-400 transition"
+                          />
+                        </div>
+
+                        {/* Date */}
+                        <div className="sm:col-span-1 md:col-span-1 lg:col-span-2">
+                          <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                            Expense Date
+                          </label>
+                          <input
+                            type="date"
+                            value={expense.date || ''}
+                            onChange={(e) => handleUpdateExpense(idx, { date: e.target.value })}
+                            className="w-full px-2 py-1.5 bg-slate-50/80 hover:bg-white focus:bg-white border border-slate-200 rounded text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition"
+                          />
+                        </div>
+
+                        {/* Payment Method */}
+                        <div className="sm:col-span-1 md:col-span-1 lg:col-span-3">
+                          <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                            Payment Method
+                          </label>
+                          <select
+                            value={expense.paymentMethod || 'WeChat Pay'}
+                            onChange={(e) =>
+                              handleUpdateExpense(idx, { paymentMethod: e.target.value as any })
+                            }
+                            className="w-full px-2 py-1.5 bg-slate-50/80 hover:bg-white focus:bg-white border border-slate-200 rounded text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 cursor-pointer transition"
+                          >
+                            <option value="WeChat Pay">WeChat Pay (微信支付)</option>
+                            <option value="Alipay">Alipay (支付宝)</option>
+                            <option value="Bank Transfer">Bank Transfer (对公转账)</option>
+                            <option value="Cash (RMB)">Cash (现金)</option>
+                            <option value="Credit Card">Credit Card</option>
+                          </select>
+                        </div>
+
+                        {/* Receipt # / Note */}
+                        <div className="sm:col-span-1 md:col-span-2 lg:col-span-3">
+                          <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                            Receipt # / Notes
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Order #, tracking #, or memo"
+                            value={expense.notes || ''}
+                            onChange={(e) => handleUpdateExpense(idx, { notes: e.target.value })}
+                            className="w-full px-2.5 py-1.5 bg-slate-50/80 hover:bg-white focus:bg-white border border-slate-200 rounded text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 placeholder:text-slate-400 transition"
+                          />
+                        </div>
+
+                        {/* Fapiao Checkbox */}
+                        <div className="sm:col-span-2 md:col-span-1 lg:col-span-1 flex flex-col justify-end">
+                          <label className="flex items-center justify-center gap-1.5 cursor-pointer select-none text-[11px] text-slate-700 font-medium bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded px-2 py-1.5 transition">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(expense.hasFapiao)}
+                              onChange={(e) => handleUpdateExpense(idx, { hasFapiao: e.target.checked })}
+                              className="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 border-slate-300 cursor-pointer"
+                            />
+                            <span className="whitespace-nowrap">发票 Fapiao</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-3.5 border border-dashed border-slate-300 rounded-lg bg-white">
+                <Receipt className="w-5 h-5 text-slate-300 mx-auto mb-1" />
+                <p className="text-xs text-slate-600 font-medium">No inquiry-specific expenses recorded yet</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Track sample purchase fees from 1688, SF Express shipping, Gaotie factory visits, or QC inspection fees directly inside this inquiry.
+                </p>
+              </div>
+            )}
+
+            {/* Consolidated Net Take-Home Profit Breakdown Card */}
+            <div className="bg-slate-900 text-white rounded-lg p-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-center shadow-xs">
+              <div>
+                <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                  Gross Sourcing Margin
+                </div>
+                <div className="text-sm font-bold font-mono text-white mt-0.5">
+                  +{formatCurrency(pricing.estimatedProfitUsd, 'USD')}
+                </div>
+                <div className="text-[10px] font-mono text-slate-400">
+                  (+¥{formatCurrency(pricing.estimatedProfitRmb, 'RMB')})
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[10px] text-amber-400 uppercase font-bold tracking-wider">
+                  Helper Payouts ({formData.helperCommissions?.length || 0})
+                </div>
+                <div className="text-sm font-bold font-mono text-amber-400 mt-0.5">
+                  -{formatCurrency(totalHelperCommission, 'USD')}
+                </div>
+                <div className="text-[10px] font-mono text-amber-400/80">
+                  (-¥{formatCurrency(totalHelperCommission * exchangeRates.USD_TO_RMB, 'RMB')})
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[10px] text-rose-300 uppercase font-bold tracking-wider">
+                  Inquiry Expenses ({formData.inquiryExpenses?.length || 0})
+                </div>
+                <div className="text-sm font-bold font-mono text-rose-300 mt-0.5">
+                  -{formatCurrency(totalInquiryExpenses.totalUsd, 'USD')}
+                </div>
+                <div className="text-[10px] font-mono text-rose-300/80">
+                  (-¥{formatCurrency(totalInquiryExpenses.totalRmb, 'RMB')})
+                </div>
+              </div>
+
+              <div className="bg-slate-800/90 rounded-md p-1.5 border border-slate-700">
+                <div className="text-[10px] text-emerald-400 uppercase font-bold tracking-wider">
+                  Your Net Take-Home Profit
+                </div>
+                <div className="text-base font-bold font-mono text-emerald-400 mt-0.5">
+                  +{formatCurrency(netAgentProfit, 'USD')}
+                </div>
+                <div className="text-[10px] font-mono text-emerald-400/80">
+                  (+¥{formatCurrency(netAgentProfit * exchangeRates.USD_TO_RMB, 'RMB')})
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Section 6: Notes / Instructions */}

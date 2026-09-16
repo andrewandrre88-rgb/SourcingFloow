@@ -1,4 +1,4 @@
-import { ExchangeRates, HelperCommission, CurrencyViewMode } from '../types';
+import { ExchangeRates, HelperCommission, CurrencyViewMode, InquiryExpense } from '../types';
 
 export const DEFAULT_EXCHANGE_RATES: ExchangeRates = {
   USD_TO_RMB: 7.25,
@@ -450,5 +450,50 @@ export function calculatePackagingDetails(params: {
     totalGrossWeightKg: Number(totalGrossWeightKg.toFixed(2)),
     totalNetWeightKg: Number(totalNetWeightKg.toFixed(2)),
   };
+}
+
+/**
+ * Calculates total out-of-pocket expenses for a specific inquiry in USD and RMB
+ */
+export function calculateTotalInquiryExpenses(
+  expenses: InquiryExpense[] | undefined,
+  usdToRmbRate: number = 7.25
+): { totalUsd: number; totalRmb: number } {
+  if (!expenses || expenses.length === 0) {
+    return { totalUsd: 0, totalRmb: 0 };
+  }
+  const rate = usdToRmbRate > 0 ? usdToRmbRate : 7.25;
+  let totalUsd = 0;
+  let totalRmb = 0;
+
+  for (const exp of expenses) {
+    const amt = Number(exp.amount) || 0;
+    if (amt <= 0) continue;
+
+    if (exp.currency === 'RMB') {
+      totalRmb += amt;
+      totalUsd += amt / rate;
+    } else {
+      totalUsd += amt;
+      totalRmb += amt * rate;
+    }
+  }
+
+  return {
+    totalUsd: Math.round(totalUsd * 100) / 100,
+    totalRmb: Math.round(totalRmb * 100) / 100,
+  };
+}
+
+/**
+ * Calculates net take-home profit for an inquiry after helper commissions AND operational expenses
+ */
+export function calculateInquiryNetProfit(params: {
+  estimatedProfitUsd: number;
+  totalHelperCommissionsUsd: number;
+  totalExpensesUsd: number;
+}): number {
+  const net = (params.estimatedProfitUsd || 0) - (params.totalHelperCommissionsUsd || 0) - (params.totalExpensesUsd || 0);
+  return Math.round(net * 100) / 100;
 }
 

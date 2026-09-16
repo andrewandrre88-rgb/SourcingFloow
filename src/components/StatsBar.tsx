@@ -7,21 +7,30 @@ import {
   FileCheck2,
   DollarSign,
   PieChart,
+  Receipt,
 } from 'lucide-react';
-import { InquiryItem, CurrencyViewMode } from '../types';
-import { formatCurrency, formatAmountByViewMode } from '../lib/currency';
+import { InquiryItem, CurrencyViewMode, ExchangeRates } from '../types';
+import {
+  formatCurrency,
+  formatAmountByViewMode,
+  calculateTotalHelperCommissions,
+  calculateTotalInquiryExpenses,
+} from '../lib/currency';
 
 interface StatsBarProps {
   inquiries: InquiryItem[];
   currencyView?: CurrencyViewMode;
   usdToRmbRate?: number;
+  exchangeRates?: ExchangeRates;
 }
 
 export const StatsBar: React.FC<StatsBarProps> = ({
   inquiries,
   currencyView = 'USD' as CurrencyViewMode,
   usdToRmbRate = 7.25,
+  exchangeRates,
 }) => {
+  const rate = exchangeRates?.USD_TO_RMB || usdToRmbRate || 7.25;
   const totalCount = inquiries.length;
 
   const sourcingCount = inquiries.filter((i) =>
@@ -44,6 +53,25 @@ export const StatsBar: React.FC<StatsBarProps> = ({
     .filter((i) => i.orderStatus !== 'Cancelled')
     .reduce((acc, curr) => acc + (curr.estimatedProfitUsd || 0), 0);
 
+  const totalInquiryExpensesUsd = inquiries
+    .filter((i) => i.orderStatus !== 'Cancelled')
+    .reduce((acc, curr) => {
+      const exp = curr.totalExpensesUsd !== undefined
+        ? curr.totalExpensesUsd
+        : calculateTotalInquiryExpenses(curr.inquiryExpenses, rate).totalUsd;
+      return acc + exp;
+    }, 0);
+
+  const totalNetTakeHomeProfitUsd = inquiries
+    .filter((i) => i.orderStatus !== 'Cancelled')
+    .reduce((acc, curr) => {
+      const helperPayout = calculateTotalHelperCommissions(curr.helperCommissions, curr.estimatedProfitUsd || 0, curr.quantity || 1);
+      const exp = curr.totalExpensesUsd !== undefined
+        ? curr.totalExpensesUsd
+        : calculateTotalInquiryExpenses(curr.inquiryExpenses, rate).totalUsd;
+      return acc + ((curr.estimatedProfitUsd || 0) - helperPayout - exp);
+    }, 0);
+
   const avgMargin =
     inquiries.length > 0
       ? (
@@ -52,8 +80,12 @@ export const StatsBar: React.FC<StatsBarProps> = ({
         ).toFixed(1)
       : '0';
 
-  const pipelineDisplay = formatAmountByViewMode(totalQuotedValueUsd, usdToRmbRate, currencyView);
-  const profitDisplay = formatAmountByViewMode(totalEstimatedProfitUsd, usdToRmbRate, currencyView);
+  const pipelineDisplay = formatAmountByViewMode(totalQuotedValueUsd, rate, currencyView);
+  const profitDisplay = formatAmountByViewMode(
+    totalInquiryExpensesUsd > 0 ? totalNetTakeHomeProfitUsd : totalEstimatedProfitUsd,
+    rate,
+    currencyView
+  );
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3 mb-3.5 sm:mb-4">
@@ -102,7 +134,7 @@ export const StatsBar: React.FC<StatsBarProps> = ({
               ? `≈ ${pipelineDisplay.secondary}`
               : currencyView === 'RMB'
               ? `≈ ${formatCurrency(totalQuotedValueUsd, 'USD')}`
-              : `≈ ${formatCurrency(totalQuotedValueUsd * usdToRmbRate, 'RMB')}`}
+              : `≈ ${formatCurrency(totalQuotedValueUsd * rate, 'RMB')}`}
           </div>
         </div>
       </div>
@@ -110,7 +142,9 @@ export const StatsBar: React.FC<StatsBarProps> = ({
       {/* Total Margin / Profit */}
       <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs hover:border-slate-300 transition">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Margins</span>
+          <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+            {totalInquiryExpensesUsd > 0 ? 'Net Profits' : 'Total Margins'}
+          </span>
           <div className="p-1 rounded bg-emerald-50 text-emerald-600 shrink-0">
             <TrendingUp className="w-3.5 h-3.5" />
           </div>
@@ -120,11 +154,17 @@ export const StatsBar: React.FC<StatsBarProps> = ({
             {profitDisplay.primary}
           </div>
           <div className="text-[10px] text-emerald-700/80 font-mono mt-0.5 truncate">
-            {currencyView === 'DUAL'
-              ? `≈ ${profitDisplay.secondary}`
-              : currencyView === 'RMB'
-              ? `≈ ${formatCurrency(totalEstimatedProfitUsd, 'USD')}`
-              : `≈ ${formatCurrency(totalEstimatedProfitUsd * usdToRmbRate, 'RMB')}`}
+            {totalInquiryExpensesUsd > 0 ? (
+              <span className="text-slate-500">
+                After -{formatCurrency(totalInquiryExpensesUsd, 'USD')} expenses
+              </span>
+            ) : currencyView === 'DUAL' ? (
+              `≈ ${profitDisplay.secondary}`
+            ) : currencyView === 'RMB' ? (
+              `≈ ${formatCurrency(totalEstimatedProfitUsd, 'USD')}`
+            ) : (
+              `≈ ${formatCurrency(totalEstimatedProfitUsd * rate, 'RMB')}`
+            )}
           </div>
         </div>
       </div>

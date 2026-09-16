@@ -17,6 +17,7 @@ import {
   Users,
   Box,
   Target,
+  Receipt,
 } from 'lucide-react';
 import { InquiryItem, OrderStatus, CurrencyViewMode } from '../types';
 import {
@@ -27,6 +28,7 @@ import {
   formatAmountByViewMode,
   formatUnitAmountByViewMode,
   calculateTotalHelperCommissions,
+  calculateTotalInquiryExpenses,
 } from '../lib/currency';
 import { detectB2BPlatform } from '../lib/b2bPlatforms';
 import { getCountryFlag } from '../lib/countryFlags';
@@ -283,7 +285,11 @@ export const InquiryTable: React.FC<InquiryTableProps> = ({
                   profitUsd,
                   item.quantity || 1
                 );
-                const netProfitUsd = Number((profitUsd - helpersCommissionUsd).toFixed(2));
+                const expensesUsd = item.totalExpensesUsd !== undefined
+                  ? item.totalExpensesUsd
+                  : calculateTotalInquiryExpenses(item.inquiryExpenses, usdToRmbRate).totalUsd;
+                const expenseCount = item.inquiryExpenses?.length || 0;
+                const netProfitUsd = Number((profitUsd - helpersCommissionUsd - expensesUsd).toFixed(2));
                 const helperCount = item.helperCommissions?.length || 0;
 
                 return (
@@ -468,11 +474,24 @@ export const InquiryTable: React.FC<InquiryTableProps> = ({
                             <Users className="w-2.5 h-2.5" />
                             <span>{helperCount} helper{helperCount > 1 ? 's' : ''} (-{currencyView === 'RMB' ? `¥${formatCurrency(helpersCommissionUsd * usdToRmbRate, 'RMB')}` : formatCurrency(helpersCommissionUsd, 'USD')})</span>
                           </span>
-                          <div className="text-[10px] font-bold text-emerald-700 font-mono">
-                            {currencyView === 'RMB'
-                              ? `Net: +¥${formatCurrency(netProfitUsd * usdToRmbRate, 'RMB')} (${formatCurrency(netProfitUsd, 'USD')})`
-                              : `Net: +${formatCurrency(netProfitUsd, 'USD')} (¥${formatCurrency(netProfitUsd * usdToRmbRate, 'RMB')})`}
-                          </div>
+                        </div>
+                      )}
+                      {expensesUsd > 0 && (
+                        <div className="mt-0.5">
+                          <span
+                            className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.2 rounded bg-rose-50 text-rose-700 border border-rose-200"
+                            title={`${expenseCount} inquiry expenses: -$${expensesUsd.toFixed(2)} (-¥${(expensesUsd * usdToRmbRate).toFixed(2)})`}
+                          >
+                            <Receipt className="w-2.5 h-2.5" />
+                            <span>{expenseCount} exp (-{currencyView === 'RMB' ? `¥${formatCurrency(expensesUsd * usdToRmbRate, 'RMB')}` : formatCurrency(expensesUsd, 'USD')})</span>
+                          </span>
+                        </div>
+                      )}
+                      {(helpersCommissionUsd > 0 || expensesUsd > 0) && (
+                        <div className="text-[10px] font-bold text-emerald-700 font-mono mt-0.5">
+                          {currencyView === 'RMB'
+                            ? `Net: +¥${formatCurrency(netProfitUsd * usdToRmbRate, 'RMB')} (${formatCurrency(netProfitUsd, 'USD')})`
+                            : `Net: +${formatCurrency(netProfitUsd, 'USD')} (¥${formatCurrency(netProfitUsd * usdToRmbRate, 'RMB')})`}
                         </div>
                       )}
                     </td>
@@ -623,7 +642,11 @@ export const InquiryTable: React.FC<InquiryTableProps> = ({
               profitUsd,
               item.quantity || 1
             );
-            const netProfitUsd = Number((profitUsd - helpersCommissionUsd).toFixed(2));
+            const expensesUsd = item.totalExpensesUsd !== undefined
+              ? item.totalExpensesUsd
+              : calculateTotalInquiryExpenses(item.inquiryExpenses, usdToRmbRate).totalUsd;
+            const expenseCount = item.inquiryExpenses?.length || 0;
+            const netProfitUsd = Number((profitUsd - helpersCommissionUsd - expensesUsd).toFixed(2));
             const helperCount = item.helperCommissions?.length || 0;
 
             return (
@@ -767,17 +790,22 @@ export const InquiryTable: React.FC<InquiryTableProps> = ({
                   </div>
                   <div className="text-right">
                     <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                      {helpersCommissionUsd > 0 ? 'Net Profit' : 'Est. Profit'}
+                      {helpersCommissionUsd > 0 || expensesUsd > 0 ? 'Net Profit' : 'Est. Profit'}
                     </div>
                     <div className="text-emerald-700 font-bold font-mono text-xs mt-0.5">
-                      +{formatCurrency(helpersCommissionUsd > 0 ? netProfitUsd : profitUsd, 'USD')}
+                      +{formatCurrency(helpersCommissionUsd > 0 || expensesUsd > 0 ? netProfitUsd : profitUsd, 'USD')}
                     </div>
                     <div className="text-[10px] text-emerald-600/80 font-mono mt-0.5">
-                      +¥{formatCurrency((helpersCommissionUsd > 0 ? netProfitUsd : profitUsd) * usdToRmbRate, 'RMB')}
+                      +¥{formatCurrency((helpersCommissionUsd > 0 || expensesUsd > 0 ? netProfitUsd : profitUsd) * usdToRmbRate, 'RMB')}
                     </div>
                     {helpersCommissionUsd > 0 && (
                       <div className="text-[10px] text-indigo-600 font-medium mt-0.5">
                         👥 {helperCount} helper{helperCount > 1 ? 's' : ''} (-{formatCurrency(helpersCommissionUsd, 'USD')})
+                      </div>
+                    )}
+                    {expensesUsd > 0 && (
+                      <div className="text-[10px] text-rose-600 font-medium mt-0.5">
+                        🧾 {expenseCount} exp (-{formatCurrency(expensesUsd, 'USD')})
                       </div>
                     )}
                   </div>

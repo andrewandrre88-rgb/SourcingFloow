@@ -22,7 +22,7 @@ import {
   calculateInquiryPricing,
 } from './lib/currency';
 import { SAMPLE_INQUIRIES } from './lib/sampleData';
-import { InquiryItem, OrderStatus, CloudSyncState, ExchangeRates, CurrencyViewMode, Customer } from './types';
+import { InquiryItem, OrderStatus, CloudSyncState, ExchangeRates, CurrencyViewMode, Customer, ServiceRequest, ServiceStatus } from './types';
 import { Header } from './components/Header';
 import { StatsBar } from './components/StatsBar';
 import { InquiryTable } from './components/InquiryTable';
@@ -34,7 +34,27 @@ import { ExchangeRateModal } from './components/ExchangeRateModal';
 import { AuthPage } from './components/AuthPage';
 import { CustomersPage } from './components/CustomersPage';
 import { CustomerModal } from './components/CustomerModal';
+import { ServicesPage } from './components/ServicesPage';
+import { ServiceModal } from './components/ServiceModal';
+import { ServiceDetailModal } from './components/ServiceDetailModal';
+import { ExpensesPage } from './components/ExpensesPage';
+import { ExpenseModal } from './components/ExpenseModal';
+import { ExpenseItem } from './types';
 import { subscribeToCustomers, saveCustomerToFirestore, deleteCustomerFromFirestore } from './lib/customersDb';
+import {
+  subscribeToServices,
+  saveServiceToFirestore,
+  deleteServiceFromFirestore,
+  getLocalServices,
+  saveLocalServices,
+} from './lib/servicesDb';
+import {
+  subscribeToExpenses,
+  saveExpenseToFirestore,
+  deleteExpenseFromFirestore,
+  getLocalExpenses,
+  saveLocalExpenses,
+} from './lib/expensesDb';
 import {
   CheckCircle2,
   AlertCircle,
@@ -85,9 +105,16 @@ export default function App() {
   // Exchange Rates state
   const [exchangeRates, setExchangeRates] = useState<ExchangeRates>(getSavedExchangeRates);
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [currentView, setCurrentView] = useState<'inquiries' | 'customers'>('inquiries');
+  const [services, setServices] = useState<ServiceRequest[]>(getLocalServices);
+  const [expenses, setExpenses] = useState<ExpenseItem[]>(getLocalExpenses);
+  const [currentView, setCurrentView] = useState<'inquiries' | 'customers' | 'services'>('inquiries');
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [customerToEdit, setCustomerToEdit] = useState<Customer | null>(null);
+  const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
+  const [serviceToEdit, setServiceToEdit] = useState<ServiceRequest | null>(null);
+  const [serviceToView, setServiceToView] = useState<ServiceRequest | null>(null);
+  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [expenseToEdit, setExpenseToEdit] = useState<ExpenseItem | null>(null);
 
   // Core Data State
   const [inquiries, setInquiries] = useState<InquiryItem[]>(() => {
@@ -317,6 +344,123 @@ export default function App() {
     }
   };
 
+  // Save local services backup
+  useEffect(() => {
+    saveLocalServices(services);
+  }, [services]);
+
+  const handleSaveService = async (savedService: ServiceRequest) => {
+    setServices((prev) => {
+      const idx = prev.findIndex((s) => s.id === savedService.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = savedService;
+        return next;
+      }
+      return [savedService, ...prev];
+    });
+    setIsServiceModalOpen(false);
+    setServiceToEdit(null);
+    if (serviceToView && serviceToView.id === savedService.id) {
+      setServiceToView(savedService);
+    }
+    showToast(`Saved service ${savedService.serviceNumber}`, 'success');
+
+    if (user && user.uid) {
+      try {
+        await saveServiceToFirestore(user.uid, savedService);
+      } catch (error: any) {
+        console.error('Failed to save service to Firestore:', error);
+      }
+    }
+  };
+
+  const handleDeleteService = async (serviceOrId: ServiceRequest | string) => {
+    const id = typeof serviceOrId === 'object' && serviceOrId !== null ? serviceOrId.id : serviceOrId;
+    if (!id) return;
+    setServices((prev) => prev.filter((s) => s.id !== id));
+    if (serviceToView && serviceToView.id === id) {
+      setServiceToView(null);
+    }
+    showToast('Deleted service request', 'success');
+
+    if (user && user.uid) {
+      try {
+        await deleteServiceFromFirestore(user.uid, id);
+      } catch (e) {
+        console.error('Failed to delete service from Firestore:', e);
+      }
+    }
+  };
+
+  const handleServiceStatusChange = async (service: ServiceRequest, status: ServiceStatus) => {
+    const updated: ServiceRequest = {
+      ...service,
+      status,
+      updatedAt: new Date().toISOString(),
+    };
+    setServices((prev) =>
+      prev.map((s) => (s.id === service.id ? updated : s))
+    );
+    if (serviceToView && serviceToView.id === service.id) {
+      setServiceToView(updated);
+    }
+    showToast(`Service status updated to "${status}"`, 'success');
+
+    if (user && user.uid) {
+      try {
+        await saveServiceToFirestore(user.uid, updated);
+      } catch (e) {
+        console.error('Failed to update service status in Firestore:', e);
+      }
+    }
+  };
+
+  const handleSaveExpense = async (savedExpense: ExpenseItem) => {
+    setExpenses((prev) => {
+      const idx = prev.findIndex((e) => e.id === savedExpense.id);
+      let next: ExpenseItem[];
+      if (idx >= 0) {
+        next = [...prev];
+        next[idx] = savedExpense;
+      } else {
+        next = [savedExpense, ...prev];
+      }
+      saveLocalExpenses(next);
+      return next;
+    });
+    setIsExpenseModalOpen(false);
+    setExpenseToEdit(null);
+    showToast(`Saved expense ${savedExpense.expenseNumber}`, 'success');
+
+    if (user && user.uid) {
+      try {
+        await saveExpenseToFirestore(user.uid, savedExpense);
+      } catch (error: any) {
+        console.error('Failed to save expense to Firestore:', error);
+      }
+    }
+  };
+
+  const handleDeleteExpense = async (expenseOrId: ExpenseItem | string) => {
+    const id = typeof expenseOrId === 'object' && expenseOrId !== null ? expenseOrId.id : expenseOrId;
+    if (!id) return;
+    setExpenses((prev) => {
+      const next = prev.filter((e) => e.id !== id);
+      saveLocalExpenses(next);
+      return next;
+    });
+    showToast('Deleted business expense record', 'success');
+
+    if (user && user.uid) {
+      try {
+        await deleteExpenseFromFirestore(user.uid, id);
+      } catch (e) {
+        console.error('Failed to delete expense from Firestore:', e);
+      }
+    }
+  };
+
   const handleUpdateRates = async (newRates: ExchangeRates) => {
     setExchangeRates(newRates);
     setIsRatesModalOpen(false);
@@ -377,6 +521,31 @@ export default function App() {
       }
     );
 
+    const unsubServices = subscribeToServices(
+      user.uid,
+      (data) => {
+        if (data && data.length > 0) {
+          setServices(data);
+        }
+      },
+      (error) => {
+        console.warn('[Firestore] Services listener warning:', error.message);
+      }
+    );
+
+    const unsubExpenses = subscribeToExpenses(
+      user.uid,
+      (data) => {
+        if (data && data.length > 0) {
+          setExpenses(data);
+          saveLocalExpenses(data);
+        }
+      },
+      (error) => {
+        console.warn('[Firestore] Expenses listener warning:', error.message);
+      }
+    );
+
     migrateLocalDataToFirestoreIfEmpty(user.uid, inquiries, exchangeRates)
       .then((result) => {
         if (result.migrated && result.count > 0) {
@@ -395,6 +564,8 @@ export default function App() {
       unsubInquiries();
       unsubRates();
       unsubCustomers();
+      unsubServices();
+      unsubExpenses();
     };
   }, [user]);
 
@@ -456,9 +627,12 @@ export default function App() {
           if (currentView === 'inquiries') {
             setInquiryToEdit(null);
             setIsInquiryModalOpen(true);
-          } else {
+          } else if (currentView === 'customers') {
             setCustomerToEdit(null);
             setIsCustomerModalOpen(true);
+          } else {
+            setServiceToEdit(null);
+            setIsServiceModalOpen(true);
           }
         }}
         onOpenRatesModal={() => setIsRatesModalOpen(true)}
@@ -470,7 +644,7 @@ export default function App() {
       <main className="flex-1 w-full max-w-none mx-auto px-3 sm:px-6 lg:px-8 xl:px-10 py-3.5 sm:py-6 space-y-4 sm:space-y-6 pb-24 sm:pb-8">
         {currentView === 'inquiries' ? (
           <>
-            <StatsBar inquiries={inquiries} exchangeRates={exchangeRates} />
+            <StatsBar inquiries={inquiries} exchangeRates={exchangeRates} currencyView={currencyView} />
             <InquiryTable 
               inquiries={inquiries}
               exchangeRates={exchangeRates}
@@ -487,7 +661,7 @@ export default function App() {
               onDuplicate={handleDuplicateInquiry}
             />
           </>
-        ) : (
+        ) : currentView === 'customers' ? (
           <CustomersPage 
             customers={customers}
             inquiries={inquiries}
@@ -522,6 +696,23 @@ export default function App() {
               setIsInquiryModalOpen(true);
             }}
           />
+        ) : (
+          <ServicesPage
+            services={services}
+            exchangeRates={exchangeRates}
+            currencyView={currencyView}
+            onAdd={() => {
+              setServiceToEdit(null);
+              setIsServiceModalOpen(true);
+            }}
+            onEdit={(service) => {
+              setServiceToEdit(service);
+              setIsServiceModalOpen(true);
+            }}
+            onView={(service) => setServiceToView(service)}
+            onDelete={handleDeleteService}
+            onStatusChange={handleServiceStatusChange}
+          />
         )}
       </main>
 
@@ -533,9 +724,12 @@ export default function App() {
             if (currentView === 'inquiries') {
               setInquiryToEdit(null);
               setIsInquiryModalOpen(true);
-            } else {
+            } else if (currentView === 'customers') {
               setCustomerToEdit(null);
               setIsCustomerModalOpen(true);
+            } else {
+              setServiceToEdit(null);
+              setIsServiceModalOpen(true);
             }
           }}
           className="p-3 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg flex items-center justify-center transition active:scale-90"
@@ -610,6 +804,43 @@ export default function App() {
         }}
         onSave={handleSaveCustomer}
         customerToEdit={customerToEdit}
+      />
+      <ServiceModal
+        isOpen={isServiceModalOpen}
+        onClose={() => {
+          setIsServiceModalOpen(false);
+          setServiceToEdit(null);
+        }}
+        onSave={handleSaveService}
+        onSaveExpense={handleSaveExpense}
+        serviceToEdit={serviceToEdit}
+        customers={customers}
+        exchangeRates={exchangeRates}
+        existingServices={services}
+      />
+      <ServiceDetailModal
+        isOpen={Boolean(serviceToView)}
+        onClose={() => setServiceToView(null)}
+        service={serviceToView}
+        exchangeRates={exchangeRates}
+        onEdit={(service) => {
+          setServiceToView(null);
+          setServiceToEdit(service);
+          setIsServiceModalOpen(true);
+        }}
+        onDelete={handleDeleteService}
+        onStatusChange={handleServiceStatusChange}
+      />
+      <ExpenseModal
+        isOpen={isExpenseModalOpen}
+        onClose={() => {
+          setIsExpenseModalOpen(false);
+          setExpenseToEdit(null);
+        }}
+        onSave={handleSaveExpense}
+        expenseToEdit={expenseToEdit}
+        exchangeRates={exchangeRates}
+        existingExpenses={expenses}
       />
       
       {/* Toast Notification */}

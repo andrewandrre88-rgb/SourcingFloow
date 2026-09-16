@@ -86,9 +86,37 @@ export interface InquiryItem {
   helperCommissions?: HelperCommission[]; // Commissions for people who helped with sourcing/QC/translation
   totalHelperCommissionUsd?: number; // Total payout for helpers ($)
   netAgentProfitUsd?: number; // Net profit for the agent after helper payouts ($)
+  inquiryExpenses?: InquiryExpense[]; // Itemized out-of-pocket expenses for this specific inquiry
+  totalExpensesUsd?: number; // Total expenses for this inquiry in USD
+  totalExpensesRmb?: number; // Total expenses for this inquiry in RMB
+  netProfitAfterExpensesUsd?: number; // Net take-home profit after helper commissions & expenses ($)
   orderStatus: OrderStatus;
   notes?: string;
   updatedAt: string;
+}
+
+export type InquiryExpenseCategory =
+  | 'Sample Purchase'
+  | 'Sample Express / Courier'
+  | 'Factory Travel & Transit'
+  | 'QC & Inspection'
+  | 'Prototyping & Packaging'
+  | 'Other / Miscellaneous';
+
+export interface InquiryExpense {
+  id: string; // Unique ID
+  category?: string; // Optional category tag
+  title: string; // Custom description of what the expense is about
+  amount: number; // Raw numeric value
+  currency: CurrencyUnit; // 'USD' | 'RMB'
+  amountUsd: number; // Normalized in USD ($)
+  amountRmb: number; // Normalized in RMB (¥)
+  date?: string; // YYYY-MM-DD
+  supplierOrPayee?: string; // Factory, Courier, Driver, Inspector name
+  paymentMethod?: ExpensePaymentMethod;
+  hasFapiao?: boolean; // Has Chinese VAT Fapiao (发票)
+  notes?: string;
+  receiptUrl?: string;
 }
 
 export interface ExchangeRates {
@@ -134,4 +162,121 @@ export interface Customer {
   createdAt: string;
   updatedAt: string;
 }
+
+export type ServiceCategory =
+  | 'Medical & Clinic Assistance'
+  | 'Company Registration'
+  | 'Factory Audit & Verification'
+  | 'Translation & Business Escort'
+  | 'Legal & Contract Review'
+  | 'Visa & Travel Support'
+  | 'Warehousing & Logistics'
+  | 'Trademark & IP'
+  | 'Sample Lab Testing'
+  | 'Concierge & Personal Request'
+  | 'Other Service';
+
+export type ServiceStatus =
+  | 'New Request'
+  | 'In Progress'
+  | 'Waiting for Client'
+  | 'Waiting for China Partner'
+  | 'Completed'
+  | 'Cancelled';
+
+export type ServicePriority = 'Low' | 'Medium' | 'High' | 'Urgent';
+
+export type ServicePaymentStatus = 'Unpaid' | 'Deposit Received' | 'Fully Paid' | 'Refunded';
+
+export interface ServiceRequest {
+  id: string; // Unique ID (e.g. SRV-2026-001)
+  serviceNumber: string; // e.g. SRV-2026-001
+  date: string; // YYYY-MM-DD
+  clientName: string; // Client Name
+  clientContact?: string; // WhatsApp / Phone / Email
+  wechatId?: string;
+  country?: string;
+  category: ServiceCategory;
+  title: string; // e.g. "Find Top Orthopedic Clinic in Guangzhou for Uncle"
+  description: string; // Scope of service, specific client requirements
+  cityLocation?: string; // e.g. Guangzhou, Shenzhen, Yiwu, Shanghai, Beijing
+  status: ServiceStatus;
+  priority: ServicePriority;
+
+  // Financials
+  quoteCurrency: CurrencyUnit; // 'USD' or 'RMB'
+  clientFee: number; // Total fee billed to client
+  estimatedCost: number; // Cost paid to China hospital / clinic / registry / partner
+  estimatedProfitUsd: number; // Calculated profit in USD
+  estimatedProfitRmb: number; // Calculated profit in RMB
+  paymentStatus: ServicePaymentStatus;
+
+  // Partner / Local contact in China
+  assignedPartner?: string; // e.g. "Dr. Lin Medical Concierge", "Shenzhen Yida Legal"
+  partnerContact?: string; // Phone / WeChat
+  partnerCommission?: number; // Commission or payout for partner
+
+  // Target timeline
+  targetDate?: string; // Target completion or appointment date
+  notes?: string;
+
+  // On-ground travel & factory relocation expenses for this service
+  travelExpenses?: {
+    transportCost: number; // Train, Didi, Flights, Car
+    hotelCost: number; // Hotel & accommodation
+    foodCost: number; // Meals, Client dinners, Food
+    otherCost: number; // Tolls, SIM, Factory entry
+    currency: CurrencyUnit;
+    notes?: string;
+  };
+  totalTravelCostUsd?: number;
+  totalTravelCostRmb?: number;
+  netProfitAfterExpensesUsd?: number;
+  netProfitAfterExpensesRmb?: number;
+
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ----------------- EXPENSES TRACKER TYPES -----------------
+export type ExpenseCategory =
+  | 'Transport'
+  | 'Hotel & Accommodation'
+  | 'Food & Meals'
+  | 'Factory Escort & Driver'
+  | 'SIM, VPN & Supplies'
+  | 'Other / Miscellaneous';
+
+export type ExpensePaymentMethod =
+  | 'WeChat Pay'
+  | 'Alipay'
+  | 'Credit Card'
+  | 'Cash (RMB)'
+  | 'Bank Transfer';
+
+export interface ExpenseItem {
+  id: string; // Unique ID (e.g. EXP-001)
+  expenseNumber: string; // e.g. EXP-2026-001
+  date: string; // YYYY-MM-DD
+  category: ExpenseCategory;
+  subType?: string; // e.g. "Gaotie / High-Speed Train", "Didi / Taxi", "Flight", "Hotel", "Business Meal"
+  title: string; // e.g. "Gaotie: Guangzhou South -> Yiwu"
+  amount: number; // Numerical amount spent
+  currency: CurrencyUnit; // RMB or USD
+  amountRmb: number; // Normalized in RMB
+  amountUsd: number; // Normalized in USD
+  city: string; // e.g. Guangzhou, Shenzhen, Yiwu, Dongguan, Foshan, Ningbo, Shanghai
+  destinationRoute?: string; // e.g. "Shenzhen -> Dongguan Plastic Factory"
+  factoryOrPartner?: string; // Visited factory or supplier name
+  factoryOrSupplier?: string; // Visited factory or supplier name (alias)
+  hasFapiao?: boolean; // Has Chinese VAT Fapiao (发票)
+  paymentMethod?: ExpensePaymentMethod;
+  linkedServiceId?: string; // Associated Service Request ID
+  linkedInquiryId?: string; // Associated Sourcing Inquiry ID
+  notes?: string;
+  receiptUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 

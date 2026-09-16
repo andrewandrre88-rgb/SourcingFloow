@@ -1,6 +1,6 @@
 {
   "name": "Sourcing Agent Client & Inquiry Tracker",
-  "description": "Manage clients, inquiries, Chinese B2B quotations (1688, Made-in-China, Yiwugo, Alibaba), profit margins, and order statuses with cloud persistence.",
+  "description": "Manage clients, inquiries, Chinese B2B quotations (1688, Made-in-China, Yiwugo, Alibaba), profit margins, on-ground China services, and factory travel and relocation expenses across China with cloud persistence.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
