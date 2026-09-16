@@ -1,6 +1,5 @@
 import {
   getFirestore,
-  initializeFirestore,
   doc,
   setDoc,
   getDoc,
@@ -19,23 +18,10 @@ import firebaseConfig from '../../firebase-applet-config.json';
 import { InquiryItem, ExchangeRates, OrderStatus } from '../types';
 import { DEFAULT_EXCHANGE_RATES } from './currency';
 
-// Initialize Firestore with auto-detect long polling to prevent iframe/proxy connection drop errors
-let firestoreInstance;
-try {
-  firestoreInstance = initializeFirestore(
-    app,
-    {
-      experimentalAutoDetectLongPolling: true,
-    },
-    firebaseConfig.firestoreDatabaseId || undefined
-  );
-} catch {
-  firestoreInstance = firebaseConfig.firestoreDatabaseId
-    ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
-    : getFirestore(app);
-}
-
-export const db = firestoreInstance;
+// Initialize Firestore according to Firebase Skill specification
+export const db = firebaseConfig.firestoreDatabaseId
+  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
+  : getFirestore(app);
 
 export enum OperationType {
   CREATE = 'create',
@@ -173,6 +159,8 @@ export function subscribeToUserInquiries(
           selectedQuoteId: data.selectedQuoteId || '',
           marginPercent: Number(data.marginPercent || 0),
           marginFixedUsd: data.marginFixedUsd !== undefined && data.marginFixedUsd !== null ? Number(data.marginFixedUsd) : undefined,
+          marginMode: data.marginMode || undefined,
+          marginDealTotal: data.marginDealTotal !== undefined && data.marginDealTotal !== null ? Number(data.marginDealTotal) : undefined,
           clientUnitPriceUsd: Number(data.clientUnitPriceUsd || 0),
           totalQuotationUsd: Number(data.totalQuotationUsd || 0),
           estimatedProfitUsd: Number(data.estimatedProfitUsd || 0),
@@ -263,6 +251,8 @@ export async function saveInquiryToFirestore(
   if (inquiry.supplierName) cleanPayload.supplierName = inquiry.supplierName;
   if (inquiry.domesticShippingRmb !== undefined && inquiry.domesticShippingRmb !== null) cleanPayload.domesticShippingRmb = safeNum(inquiry.domesticShippingRmb);
   if (inquiry.marginFixedUsd !== undefined && inquiry.marginFixedUsd !== null) cleanPayload.marginFixedUsd = safeNum(inquiry.marginFixedUsd);
+  if (inquiry.marginMode) cleanPayload.marginMode = inquiry.marginMode;
+  if (inquiry.marginDealTotal !== undefined && inquiry.marginDealTotal !== null) cleanPayload.marginDealTotal = safeNum(inquiry.marginDealTotal);
   if (inquiry.selectedQuoteId) cleanPayload.selectedQuoteId = inquiry.selectedQuoteId;
   if (inquiry.notes) cleanPayload.notes = inquiry.notes;
   if (Array.isArray(inquiry.helperCommissions)) cleanPayload.helperCommissions = inquiry.helperCommissions;
@@ -315,7 +305,8 @@ export async function deleteInquiryFromFirestore(
  */
 export function subscribeToUserExchangeRates(
   userId: string,
-  onData: (rates: ExchangeRates) => void
+  onData: (rates: ExchangeRates) => void,
+  onError?: (error: Error) => void
 ): () => void {
   const uid = typeof userId === 'string' ? userId : (userId as any)?.uid ? String((userId as any).uid) : '';
   if (!uid) return () => {};
@@ -337,6 +328,7 @@ export function subscribeToUserExchangeRates(
     },
     (error) => {
       handleFirestoreError(error, OperationType.GET, path);
+      if (onError) onError(error);
     }
   );
 }
@@ -429,6 +421,8 @@ export async function migrateLocalDataToFirestoreIfEmpty(
         if (item.supplierName) cleanPayload.supplierName = item.supplierName;
         if (item.domesticShippingRmb !== undefined && item.domesticShippingRmb !== null) cleanPayload.domesticShippingRmb = Number(item.domesticShippingRmb);
         if (item.marginFixedUsd !== undefined && item.marginFixedUsd !== null) cleanPayload.marginFixedUsd = Number(item.marginFixedUsd);
+        if (item.marginMode) cleanPayload.marginMode = item.marginMode;
+        if (item.marginDealTotal !== undefined && item.marginDealTotal !== null) cleanPayload.marginDealTotal = Number(item.marginDealTotal);
         if (item.selectedQuoteId) cleanPayload.selectedQuoteId = item.selectedQuoteId;
         if (item.notes) cleanPayload.notes = item.notes;
         if (Array.isArray(item.helperCommissions)) cleanPayload.helperCommissions = item.helperCommissions;

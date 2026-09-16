@@ -42,6 +42,7 @@ import {
   HelperCommission,
   HelperCommissionType,
   CurrencyUnit,
+  MarginMode,
 } from '../types';
 import {
   calculateInquiryPricing,
@@ -119,7 +120,8 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
     Record<string, { price?: string; shipping?: string }>
   >({});
   const [targetPriceRaw, setTargetPriceRaw] = useState<string | null>(null);
-  const [marginMode, setMarginMode] = useState<'percent' | 'fixed_usd' | 'fixed_rmb'>('percent');
+  const [marginMode, setMarginMode] = useState<MarginMode>('percent');
+  const [marginInputRaw, setMarginInputRaw] = useState<string>('25');
   const [fixedMarginRmb, setFixedMarginRmb] = useState<number>(0);
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -191,6 +193,28 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
       } else {
         setTargetPriceCurrency('USD');
       }
+
+      const initialMode: MarginMode = inquiryToEdit.marginMode || (
+        inquiryToEdit.marginDealTotal && inquiryToEdit.marginDealTotal > 0
+          ? 'deal_usd'
+          : inquiryToEdit.marginFixedUsd && inquiryToEdit.marginFixedUsd > 0 && !inquiryToEdit.marginPercent
+          ? 'fixed_usd'
+          : 'percent'
+      );
+      setMarginMode(initialMode);
+      if (initialMode === 'deal_usd') {
+        setMarginInputRaw(inquiryToEdit.marginDealTotal !== undefined ? String(inquiryToEdit.marginDealTotal) : '');
+      } else if (initialMode === 'deal_rmb') {
+        setMarginInputRaw(inquiryToEdit.marginDealTotal !== undefined ? String(inquiryToEdit.marginDealTotal) : '');
+      } else if (initialMode === 'fixed_usd') {
+        setMarginInputRaw(inquiryToEdit.marginFixedUsd !== undefined ? String(inquiryToEdit.marginFixedUsd) : '');
+      } else if (initialMode === 'fixed_rmb') {
+        const rmbVal = inquiryToEdit.marginFixedUsd ? (inquiryToEdit.marginFixedUsd * exchangeRates.USD_TO_RMB) : 0;
+        setFixedMarginRmb(rmbVal);
+        setMarginInputRaw(rmbVal ? String(parseFloat(rmbVal.toFixed(4))) : '');
+      } else {
+        setMarginInputRaw(inquiryToEdit.marginPercent !== undefined ? String(inquiryToEdit.marginPercent) : '25');
+      }
     } else {
       const nextNum = `INQ-${new Date().getFullYear()}-${String(existingCount + 1).padStart(3, '0')}`;
       const defaultQuoteId = 'quote_' + Date.now();
@@ -236,11 +260,15 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
         selectedQuoteId: defaultQuoteId,
         marginPercent: 25,
         marginFixedUsd: 0,
+        marginDealTotal: undefined,
         helperCommissions: [],
         orderStatus: 'New Inquiry',
         notes: '',
         updatedAt: new Date().toISOString(),
       });
+      setMarginMode('percent');
+      setMarginInputRaw('25');
+      setFixedMarginRmb(0);
     }
   }, [inquiryToEdit, existingCount, isOpen]);
 
@@ -249,12 +277,17 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
   const activePrice1688 = !isNaN(Number(selectedQuote?.price1688Rmb)) ? Math.max(0, Number(selectedQuote?.price1688Rmb)) : 0;
   const activeShipping = !isNaN(Number(selectedQuote?.domesticShippingRmb)) ? Math.max(0, Number(selectedQuote?.domesticShippingRmb)) : 0;
 
+  const activeDealProfitUsd = (marginMode === 'deal_usd' || marginMode === 'deal_rmb') && formData.marginDealTotal !== undefined && !isNaN(Number(formData.marginDealTotal))
+    ? (marginMode === 'deal_usd' ? Number(formData.marginDealTotal) : Number(formData.marginDealTotal) / (exchangeRates.USD_TO_RMB > 0 ? exchangeRates.USD_TO_RMB : 7.25))
+    : undefined;
+
   const pricing = calculateInquiryPricing({
     quantity: Number(formData.quantity) || 1,
     price1688Rmb: activePrice1688,
     domesticShippingRmb: activeShipping,
     marginPercent: Number(formData.marginPercent) || 0,
     marginFixedUsd: Number(formData.marginFixedUsd) || 0,
+    marginTotalDealUsd: activeDealProfitUsd,
     usdToRmbRate: exchangeRates.USD_TO_RMB,
   });
 
@@ -308,6 +341,192 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
       const usd = Number((val / rate).toFixed(6));
       setFormData((prev) => ({ ...prev, targetPriceRmb: val, targetPriceUsd: usd }));
     }
+  };
+
+  // Margin and Profit Mode Handlers
+  const handleMarginModeSwitch = (newMode: MarginMode) => {
+    setMarginMode(newMode);
+    const rate = exchangeRates.USD_TO_RMB > 0 ? exchangeRates.USD_TO_RMB : 7.25;
+    const qty = Math.max(1, Number(formData.quantity) || 1);
+
+    if (newMode === 'percent') {
+      const defaultPct = formData.marginPercent > 0 ? formData.marginPercent : 20;
+      setMarginInputRaw(String(defaultPct));
+      setFormData((prev) => ({
+        ...prev,
+        marginPercent: defaultPct,
+        marginFixedUsd: 0,
+        marginDealTotal: undefined,
+      }));
+    } else if (newMode === 'fixed_usd') {
+      const defaultVal = formData.marginFixedUsd && formData.marginFixedUsd > 0 ? formData.marginFixedUsd : 0.5;
+      setMarginInputRaw(String(defaultVal));
+      setFormData((prev) => ({
+        ...prev,
+        marginPercent: 0,
+        marginFixedUsd: defaultVal,
+        marginDealTotal: undefined,
+      }));
+    } else if (newMode === 'fixed_rmb') {
+      const rmbVal = formData.marginFixedUsd && formData.marginFixedUsd > 0
+        ? parseFloat((formData.marginFixedUsd * rate).toFixed(4))
+        : 2.0;
+      setFixedMarginRmb(rmbVal);
+      setMarginInputRaw(String(rmbVal));
+      setFormData((prev) => ({
+        ...prev,
+        marginPercent: 0,
+        marginFixedUsd: rmbVal / rate,
+        marginDealTotal: undefined,
+      }));
+    } else if (newMode === 'deal_usd') {
+      let dealUsd = 500;
+      if (formData.marginDealTotal && formData.marginDealTotal > 0) {
+        dealUsd = formData.marginDealTotal;
+      } else if (pricing.estimatedProfitUsd > 0) {
+        dealUsd = parseFloat(pricing.estimatedProfitUsd.toFixed(2));
+      }
+      setMarginInputRaw(String(dealUsd));
+      setFormData((prev) => ({
+        ...prev,
+        marginPercent: 0,
+        marginDealTotal: dealUsd,
+        marginFixedUsd: dealUsd / qty,
+      }));
+    } else if (newMode === 'deal_rmb') {
+      let dealRmb = 3500;
+      if (formData.marginDealTotal && formData.marginDealTotal > 0) {
+        dealRmb = formData.marginDealTotal;
+      } else if (pricing.estimatedProfitRmb > 0) {
+        dealRmb = parseFloat(pricing.estimatedProfitRmb.toFixed(2));
+      }
+      setMarginInputRaw(String(dealRmb));
+      setFormData((prev) => ({
+        ...prev,
+        marginPercent: 0,
+        marginDealTotal: dealRmb,
+        marginFixedUsd: (dealRmb / rate) / qty,
+      }));
+    }
+  };
+
+  const handleMarginInputChange = (valStr: string) => {
+    const cleaned = cleanCurrencyInput(valStr);
+    setMarginInputRaw(cleaned);
+
+    if (cleaned === '' || cleaned === '.') {
+      setFormData((prev) => ({
+        ...prev,
+        marginPercent: marginMode === 'percent' ? 0 : prev.marginPercent,
+        marginFixedUsd: marginMode !== 'percent' ? 0 : prev.marginFixedUsd,
+        marginDealTotal: marginMode === 'deal_usd' || marginMode === 'deal_rmb' ? 0 : undefined,
+      }));
+      return;
+    }
+
+    const num = parseFloat(cleaned);
+    if (isNaN(num)) return;
+
+    const rate = exchangeRates.USD_TO_RMB > 0 ? exchangeRates.USD_TO_RMB : 7.25;
+    const qty = Math.max(1, Number(formData.quantity) || 1);
+
+    if (marginMode === 'percent') {
+      setFormData((prev) => ({
+        ...prev,
+        marginPercent: num,
+        marginFixedUsd: 0,
+        marginDealTotal: undefined,
+      }));
+    } else if (marginMode === 'fixed_usd') {
+      setFormData((prev) => ({
+        ...prev,
+        marginPercent: 0,
+        marginFixedUsd: num,
+        marginDealTotal: undefined,
+      }));
+    } else if (marginMode === 'fixed_rmb') {
+      setFixedMarginRmb(num);
+      setFormData((prev) => ({
+        ...prev,
+        marginPercent: 0,
+        marginFixedUsd: num / rate,
+        marginDealTotal: undefined,
+      }));
+    } else if (marginMode === 'deal_usd') {
+      setFormData((prev) => ({
+        ...prev,
+        marginPercent: 0,
+        marginDealTotal: num,
+        marginFixedUsd: num / qty,
+      }));
+    } else if (marginMode === 'deal_rmb') {
+      setFormData((prev) => ({
+        ...prev,
+        marginPercent: 0,
+        marginDealTotal: num,
+        marginFixedUsd: (num / rate) / qty,
+      }));
+    }
+  };
+
+  const applyMarginPreset = (val: number) => {
+    setMarginInputRaw(String(val));
+    const rate = exchangeRates.USD_TO_RMB > 0 ? exchangeRates.USD_TO_RMB : 7.25;
+    const qty = Math.max(1, Number(formData.quantity) || 1);
+
+    if (marginMode === 'percent') {
+      setFormData((prev) => ({
+        ...prev,
+        marginPercent: val,
+        marginFixedUsd: 0,
+        marginDealTotal: undefined,
+      }));
+    } else if (marginMode === 'fixed_usd') {
+      setFormData((prev) => ({
+        ...prev,
+        marginPercent: 0,
+        marginFixedUsd: val,
+        marginDealTotal: undefined,
+      }));
+    } else if (marginMode === 'fixed_rmb') {
+      setFixedMarginRmb(val);
+      setFormData((prev) => ({
+        ...prev,
+        marginPercent: 0,
+        marginFixedUsd: val / rate,
+        marginDealTotal: undefined,
+      }));
+    } else if (marginMode === 'deal_usd') {
+      setFormData((prev) => ({
+        ...prev,
+        marginPercent: 0,
+        marginDealTotal: val,
+        marginFixedUsd: val / qty,
+      }));
+    } else if (marginMode === 'deal_rmb') {
+      setFormData((prev) => ({
+        ...prev,
+        marginPercent: 0,
+        marginDealTotal: val,
+        marginFixedUsd: (val / rate) / qty,
+      }));
+    }
+  };
+
+  const handleQuantityChange = (newQtyStr: string) => {
+    const qty = Math.max(0, parseFloat(newQtyStr) || 0);
+    const effectiveQty = Math.max(1, qty);
+    const rate = exchangeRates.USD_TO_RMB > 0 ? exchangeRates.USD_TO_RMB : 7.25;
+
+    setFormData((prev) => {
+      const updated = { ...prev, quantity: newQtyStr as any };
+      if (marginMode === 'deal_usd' && prev.marginDealTotal) {
+        updated.marginFixedUsd = prev.marginDealTotal / effectiveQty;
+      } else if (marginMode === 'deal_rmb' && prev.marginDealTotal) {
+        updated.marginFixedUsd = (prev.marginDealTotal / rate) / effectiveQty;
+      }
+      return updated;
+    });
   };
 
   const getQuotePriceCurrency = (quoteId: string): CurrencyUnit => {
@@ -592,6 +811,10 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
       selectedQuoteId: formData.selectedQuoteId || '',
       marginPercent: !isNaN(Number(formData.marginPercent)) ? Number(formData.marginPercent) : 0,
       marginFixedUsd: !isNaN(Number(formData.marginFixedUsd)) ? Number(formData.marginFixedUsd) : 0,
+      marginMode: marginMode,
+      marginDealTotal: (marginMode === 'deal_usd' || marginMode === 'deal_rmb') && formData.marginDealTotal !== undefined && !isNaN(Number(formData.marginDealTotal))
+        ? Number(formData.marginDealTotal)
+        : undefined,
       clientUnitPriceUsd: !isNaN(Number(pricing.clientUnitPriceUsd)) ? pricing.clientUnitPriceUsd : 0,
       totalQuotationUsd: !isNaN(Number(pricing.totalQuotationUsd)) ? pricing.totalQuotationUsd : 0,
       estimatedProfitUsd: !isNaN(Number(pricing.estimatedProfitUsd)) ? pricing.estimatedProfitUsd : 0,
@@ -1903,9 +2126,7 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
                     step="any"
                     required
                     value={formData.quantity || ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, quantity: e.target.value as any })
-                    }
+                    onChange={(e) => handleQuantityChange(e.target.value)}
                     className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs text-slate-900 font-semibold focus:outline-none focus:border-indigo-500 shadow-xs pr-12"
                   />
                   <span className="absolute right-2.5 top-1.5 text-xs text-slate-400 font-medium">
@@ -1916,58 +2137,91 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
 
               {/* Agent Margin Mode & Input */}
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-[11px] font-bold text-green-600">
-                    Agent Sourcing Margin
-                  </label>
+                <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
+                  <div className="flex items-center gap-1.5">
+                    <label className="block text-[11px] font-bold text-green-600">
+                      Agent Profit & Margin
+                    </label>
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
+                      marginMode === 'deal_usd' || marginMode === 'deal_rmb'
+                        ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                        : 'bg-green-100 text-green-800 border border-green-300'
+                    }`}>
+                      {marginMode === 'deal_usd' || marginMode === 'deal_rmb' ? '★ Whole Deal Profit' : 'Per-Piece Margin'}
+                    </span>
+                  </div>
+
+                  {/* Mode Selector Tabs */}
                   <div className="inline-flex rounded bg-slate-200 p-0.5 text-[9px] font-bold">
                     <button
+                      id="modal-margin-mode-percent"
                       type="button"
-                      onClick={() => {
-                        setMarginMode('percent');
-                        if (formData.marginPercent === 0 && formData.marginFixedUsd) {
-                          setFormData((prev) => ({ ...prev, marginPercent: 20, marginFixedUsd: 0 }));
-                        }
-                      }}
-                      className={`px-1.5 py-0.2 rounded transition ${
+                      onClick={() => handleMarginModeSwitch('percent')}
+                      className={`px-1.5 py-0.5 rounded transition ${
                         marginMode === 'percent'
                           ? 'bg-white text-green-700 shadow-2xs font-bold'
-                          : 'text-slate-500 hover:text-slate-800'
+                          : 'text-slate-600 hover:text-slate-900'
                       }`}
+                      title="Percentage markup on supplier unit cost"
                     >
                       % Margin
                     </button>
                     <button
+                      id="modal-margin-mode-fixed-usd"
                       type="button"
-                      onClick={() => {
-                        setMarginMode('fixed_usd');
-                        setFormData((prev) => ({ ...prev, marginPercent: 0 }));
-                      }}
-                      className={`px-1.5 py-0.2 rounded transition ${
+                      onClick={() => handleMarginModeSwitch('fixed_usd')}
+                      className={`px-1.5 py-0.5 rounded transition ${
                         marginMode === 'fixed_usd'
                           ? 'bg-white text-indigo-700 shadow-2xs font-bold'
-                          : 'text-slate-500 hover:text-slate-800'
+                          : 'text-slate-600 hover:text-slate-900'
                       }`}
+                      title="Add fixed USD profit per piece (e.g. $0.005/pc)"
                     >
-                      Fixed $ USD
+                      $ / pc
                     </button>
                     <button
+                      id="modal-margin-mode-fixed-rmb"
                       type="button"
-                      onClick={() => {
-                        setMarginMode('fixed_rmb');
-                        setFormData((prev) => ({ ...prev, marginPercent: 0 }));
-                      }}
-                      className={`px-1.5 py-0.2 rounded transition ${
+                      onClick={() => handleMarginModeSwitch('fixed_rmb')}
+                      className={`px-1.5 py-0.5 rounded transition ${
                         marginMode === 'fixed_rmb'
                           ? 'bg-white text-emerald-700 shadow-2xs font-bold'
-                          : 'text-slate-500 hover:text-slate-800'
+                          : 'text-slate-600 hover:text-slate-900'
                       }`}
+                      title="Add fixed RMB profit per piece (e.g. ¥0.05/pc)"
                     >
-                      Fixed ¥ RMB
+                      ¥ / pc
+                    </button>
+                    <button
+                      id="modal-margin-mode-deal-usd"
+                      type="button"
+                      onClick={() => handleMarginModeSwitch('deal_usd')}
+                      className={`px-1.5 py-0.5 rounded transition ${
+                        marginMode === 'deal_usd'
+                          ? 'bg-white text-amber-800 shadow-2xs font-bold'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                      title="Total lump sum profit on the entire deal in USD (e.g. $500 or $0.005)"
+                    >
+                      $ Whole Deal
+                    </button>
+                    <button
+                      id="modal-margin-mode-deal-rmb"
+                      type="button"
+                      onClick={() => handleMarginModeSwitch('deal_rmb')}
+                      className={`px-1.5 py-0.5 rounded transition ${
+                        marginMode === 'deal_rmb'
+                          ? 'bg-white text-orange-800 shadow-2xs font-bold'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                      title="Total lump sum profit on the entire deal in RMB (e.g. ¥3500)"
+                    >
+                      ¥ Whole Deal
                     </button>
                   </div>
                 </div>
 
+                {/* Input Fields by Mode */}
                 {marginMode === 'percent' && (
                   <div className="relative">
                     <input
@@ -1975,21 +2229,13 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
                       type="text"
                       inputMode="decimal"
                       autoComplete="off"
-                      placeholder="e.g. 20 or 2.5"
+                      placeholder="e.g. 20, 2.5, or 0.005"
                       required
-                      value={formData.marginPercent ?? ''}
-                      onChange={(e) => {
-                        const cleaned = cleanCurrencyInput(e.target.value);
-                        const val = parseFloat(cleaned);
-                        setFormData({
-                          ...formData,
-                          marginPercent: !isNaN(val) ? val : (cleaned === '' ? ('' as any) : 0),
-                          marginFixedUsd: 0,
-                        });
-                      }}
-                      className="w-full pr-6 pl-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs text-green-700 font-bold focus:outline-none focus:border-indigo-500 shadow-xs"
+                      value={marginInputRaw}
+                      onChange={(e) => handleMarginInputChange(e.target.value)}
+                      className="w-full pr-7 pl-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs text-green-700 font-bold focus:outline-none focus:border-green-500 shadow-xs"
                     />
-                    <span className="absolute right-2.5 top-1.5 text-slate-400 text-xs">%</span>
+                    <span className="absolute right-2.5 top-1.5 text-slate-400 text-xs font-bold">%</span>
                   </div>
                 )}
 
@@ -2002,16 +2248,8 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
                       inputMode="decimal"
                       autoComplete="off"
                       placeholder="e.g. 0.005 or 1.50"
-                      value={formData.marginFixedUsd ?? ''}
-                      onChange={(e) => {
-                        const cleaned = cleanCurrencyInput(e.target.value);
-                        const val = parseFloat(cleaned);
-                        setFormData({
-                          ...formData,
-                          marginFixedUsd: !isNaN(val) ? val : (cleaned === '' ? ('' as any) : 0),
-                          marginPercent: 0,
-                        });
-                      }}
+                      value={marginInputRaw}
+                      onChange={(e) => handleMarginInputChange(e.target.value)}
                       className="w-full pl-6 pr-14 py-1.5 bg-white border border-slate-300 rounded text-xs text-indigo-700 font-bold focus:outline-none focus:border-indigo-500 shadow-xs"
                     />
                     <span className="absolute right-2 top-1.5 text-[10px] text-slate-400 font-mono">
@@ -2028,41 +2266,98 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
                       type="text"
                       inputMode="decimal"
                       autoComplete="off"
-                      placeholder="e.g. 0.05 or 10"
-                      value={fixedMarginRmb || (formData.marginFixedUsd ? (formData.marginFixedUsd * exchangeRates.USD_TO_RMB).toFixed(4) : '')}
-                      onChange={(e) => {
-                        const cleaned = cleanCurrencyInput(e.target.value);
-                        const parsed = parseFloat(cleaned);
-                        setFixedMarginRmb(!isNaN(parsed) ? parsed : (cleaned === '' ? ('' as any) : 0));
-                        const rate = exchangeRates.USD_TO_RMB > 0 ? exchangeRates.USD_TO_RMB : 7.25;
-                        setFormData({
-                          ...formData,
-                          marginFixedUsd: !isNaN(parsed) ? parsed / rate : 0,
-                          marginPercent: 0,
-                        });
-                      }}
-                      className="w-full pl-6 pr-14 py-1.5 bg-white border border-slate-300 rounded text-xs text-emerald-700 font-bold focus:outline-none focus:border-indigo-500 shadow-xs"
+                      placeholder="e.g. 0.005 or 0.50"
+                      value={marginInputRaw}
+                      onChange={(e) => handleMarginInputChange(e.target.value)}
+                      className="w-full pl-6 pr-14 py-1.5 bg-white border border-slate-300 rounded text-xs text-emerald-700 font-bold focus:outline-none focus:border-emerald-500 shadow-xs"
                     />
                     <span className="absolute right-2 top-1.5 text-[10px] text-slate-400 font-mono">
                       / pc (¥)
                     </span>
                   </div>
                 )}
+
+                {marginMode === 'deal_usd' && (
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-1.5 text-slate-400 text-xs font-bold">$</span>
+                    <input
+                      id="modal-margin-deal-usd-input"
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      placeholder="e.g. 500 or 0.005"
+                      value={marginInputRaw}
+                      onChange={(e) => handleMarginInputChange(e.target.value)}
+                      className="w-full pl-6 pr-24 py-1.5 bg-white border border-amber-300 rounded text-xs text-amber-800 font-bold focus:outline-none focus:border-amber-500 shadow-xs ring-1 ring-amber-100"
+                    />
+                    <span className="absolute right-2 top-1.5 text-[10px] text-amber-700 font-bold tracking-tight">
+                      Whole Deal ($)
+                    </span>
+                  </div>
+                )}
+
+                {marginMode === 'deal_rmb' && (
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-1.5 text-slate-400 text-xs font-bold">¥</span>
+                    <input
+                      id="modal-margin-deal-rmb-input"
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      placeholder="e.g. 3500 or 50"
+                      value={marginInputRaw}
+                      onChange={(e) => handleMarginInputChange(e.target.value)}
+                      className="w-full pl-6 pr-24 py-1.5 bg-white border border-orange-300 rounded text-xs text-orange-800 font-bold focus:outline-none focus:border-orange-500 shadow-xs ring-1 ring-orange-100"
+                    />
+                    <span className="absolute right-2 top-1.5 text-[10px] text-orange-700 font-bold tracking-tight">
+                      Whole Deal (¥)
+                    </span>
+                  </div>
+                )}
+
+                {/* Helper info line explaining profit calculation */}
+                <div className="mt-1 text-[10px] text-slate-500 font-mono">
+                  {marginMode === 'deal_usd' && (
+                    <span className="text-amber-800">
+                      Total Deal Profit: +{formatCurrency(pricing.estimatedProfitUsd, 'USD')} (+¥{formatCurrency(pricing.estimatedProfitRmb, 'RMB')}) ➔ <strong>+{formatUnitPrice(pricing.profitPerUnitUsd, 'USD')}/pc</strong> across {(Number(formData.quantity) || 1).toLocaleString()} pcs
+                    </span>
+                  )}
+                  {marginMode === 'deal_rmb' && (
+                    <span className="text-orange-800">
+                      Total Deal Profit: +¥{formatCurrency(pricing.estimatedProfitRmb, 'RMB')} (+{formatCurrency(pricing.estimatedProfitUsd, 'USD')}) ➔ <strong>+{formatUnitPrice(pricing.profitPerUnitUsd, 'USD')}/pc</strong> (¥{formatUnitPrice(pricing.profitPerUnitRmb, 'RMB')})
+                    </span>
+                  )}
+                  {marginMode === 'fixed_usd' && (
+                    <span className="text-indigo-700">
+                      Unit Margin: +{formatUnitPrice(pricing.profitPerUnitUsd, 'USD')}/pc (¥{formatUnitPrice(pricing.profitPerUnitRmb, 'RMB')}) ➔ Total Deal Profit: <strong>+{formatCurrency(pricing.estimatedProfitUsd, 'USD')}</strong>
+                    </span>
+                  )}
+                  {marginMode === 'fixed_rmb' && (
+                    <span className="text-emerald-700">
+                      Unit Margin: +¥{formatUnitPrice(pricing.profitPerUnitRmb, 'RMB')}/pc ({formatUnitPrice(pricing.profitPerUnitUsd, 'USD')}) ➔ Total Deal Profit: <strong>+{formatCurrency(pricing.estimatedProfitUsd, 'USD')}</strong>
+                    </span>
+                  )}
+                  {marginMode === 'percent' && (
+                    <span className="text-green-700">
+                      +{formData.marginPercent || 0}% Markup ➔ +{formatUnitPrice(pricing.profitPerUnitUsd, 'USD')}/pc ➔ Total Deal Profit: <strong>+{formatCurrency(pricing.estimatedProfitUsd, 'USD')}</strong>
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
             {/* Quick Margin Preset Buttons */}
-            <div className="flex items-center space-x-1.5 pt-0.5">
+            <div className="flex items-center space-x-1.5 pt-0.5 flex-wrap gap-y-1">
               <span className="text-[11px] text-slate-500 font-medium">Presets:</span>
               {marginMode === 'percent' &&
-                [10, 15, 20, 25, 30].map((pct) => (
+                [5, 10, 15, 20, 25, 30].map((pct) => (
                   <button
                     key={pct}
                     type="button"
-                    onClick={() => setFormData({ ...formData, marginPercent: pct, marginFixedUsd: 0 })}
+                    onClick={() => applyMarginPreset(pct)}
                     className={`px-2 py-0.5 rounded text-[11px] transition ${
-                      formData.marginPercent === pct
-                        ? 'bg-indigo-600 text-white font-bold'
+                      Number(formData.marginPercent) === pct
+                        ? 'bg-green-600 text-white font-bold'
                         : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 font-medium'
                     }`}
                   >
@@ -2070,29 +2365,26 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
                   </button>
                 ))}
               {marginMode === 'fixed_usd' &&
-                [0.5, 1.0, 2.0, 3.0, 5.0].map((usd) => (
+                [0.005, 0.01, 0.05, 0.20, 0.5, 1.0, 2.0].map((usd) => (
                   <button
                     key={usd}
                     type="button"
-                    onClick={() => setFormData({ ...formData, marginFixedUsd: usd, marginPercent: 0 })}
+                    onClick={() => applyMarginPreset(usd)}
                     className={`px-2 py-0.5 rounded text-[11px] transition ${
-                      formData.marginFixedUsd === usd
+                      Number(formData.marginFixedUsd) === usd
                         ? 'bg-indigo-600 text-white font-bold'
                         : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 font-medium'
                     }`}
                   >
-                    +${usd.toFixed(2)}/pc
+                    +${usd < 0.01 ? usd : usd.toFixed(usd < 1 ? 2 : 2)}/pc
                   </button>
                 ))}
               {marginMode === 'fixed_rmb' &&
-                [2, 5, 10, 20, 50].map((rmb) => (
+                [0.01, 0.05, 0.1, 0.5, 1, 2, 5].map((rmb) => (
                   <button
                     key={rmb}
                     type="button"
-                    onClick={() => {
-                      setFixedMarginRmb(rmb);
-                      setFormData({ ...formData, marginFixedUsd: rmb / exchangeRates.USD_TO_RMB, marginPercent: 0 });
-                    }}
+                    onClick={() => applyMarginPreset(rmb)}
                     className={`px-2 py-0.5 rounded text-[11px] transition ${
                       fixedMarginRmb === rmb
                         ? 'bg-emerald-600 text-white font-bold'
@@ -2100,6 +2392,36 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
                     }`}
                   >
                     +¥{rmb}/pc
+                  </button>
+                ))}
+              {marginMode === 'deal_usd' &&
+                [0.005, 50, 100, 250, 500, 1000, 2500, 5000].map((deal) => (
+                  <button
+                    key={deal}
+                    type="button"
+                    onClick={() => applyMarginPreset(deal)}
+                    className={`px-2 py-0.5 rounded text-[11px] transition ${
+                      Number(formData.marginDealTotal) === deal
+                        ? 'bg-amber-600 text-white font-bold'
+                        : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 font-medium'
+                    }`}
+                  >
+                    +${deal < 0.01 ? deal : deal.toLocaleString()}
+                  </button>
+                ))}
+              {marginMode === 'deal_rmb' &&
+                [50, 200, 500, 1000, 2000, 3500, 5000, 10000].map((deal) => (
+                  <button
+                    key={deal}
+                    type="button"
+                    onClick={() => applyMarginPreset(deal)}
+                    className={`px-2 py-0.5 rounded text-[11px] transition ${
+                      Number(formData.marginDealTotal) === deal
+                        ? 'bg-orange-600 text-white font-bold'
+                        : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 font-medium'
+                    }`}
+                  >
+                    +¥{deal.toLocaleString()}
                   </button>
                 ))}
             </div>
@@ -2144,7 +2466,7 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
 
               <div>
                 <div className="text-[10px] text-green-600 uppercase tracking-wider font-bold">
-                  Gross Margin
+                  {marginMode === 'deal_usd' || marginMode === 'deal_rmb' ? 'Whole Deal Profit' : 'Gross Margin'}
                 </div>
                 <div className="text-sm font-bold text-green-600 mt-0.5 font-mono">
                   +{formatCurrency(pricing.estimatedProfitUsd, 'USD')}

@@ -334,34 +334,62 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
     
-    const unsubInquiries = subscribeToUserInquiries(user.uid, (data) => {
-      setInquiries(data);
-      setSyncState(prev => ({ 
-        ...prev, 
-        status: 'connected', 
-        itemCount: data.length,
-        lastSyncedAt: new Date().toISOString()
-      }));
-    });
-
-    const unsubRates = subscribeToUserExchangeRates(user.uid, (rates) => {
-      if (rates) {
-        setExchangeRates(rates);
-        saveExchangeRates(rates);
+    const unsubInquiries = subscribeToUserInquiries(
+      user.uid,
+      (data) => {
+        setInquiries(data);
+        setSyncState((prev) => ({
+          ...prev,
+          status: 'connected',
+          itemCount: data.length,
+          lastSyncedAt: new Date().toISOString(),
+        }));
+      },
+      (error) => {
+        console.warn('[Firestore] Inquiries listener warning (offline or retrying):', error.message);
+        setSyncState((prev) => ({
+          ...prev,
+          status: 'offline',
+        }));
       }
-    });
+    );
+
+    const unsubRates = subscribeToUserExchangeRates(
+      user.uid,
+      (rates) => {
+        if (rates) {
+          setExchangeRates(rates);
+          saveExchangeRates(rates);
+        }
+      },
+      (error) => {
+        console.warn('[Firestore] Exchange rates listener warning:', error.message);
+      }
+    );
     
-    const unsubCustomers = subscribeToCustomers(user.uid, (data) => {
-      setCustomers(data);
-    });
-
-    migrateLocalDataToFirestoreIfEmpty(user.uid, inquiries, exchangeRates).then((result) => {
-      if (result.migrated && result.count > 0) {
-        showToast(`Migrated ${result.count} local inquiries to Cloud Firestore`, 'success');
+    const unsubCustomers = subscribeToCustomers(
+      user.uid,
+      (data) => {
+        setCustomers(data);
+      },
+      (error) => {
+        console.warn('[Firestore] Customers listener warning:', error.message);
       }
-    }).catch(console.error);
+    );
 
-    syncUserProfile(user).catch(console.error);
+    migrateLocalDataToFirestoreIfEmpty(user.uid, inquiries, exchangeRates)
+      .then((result) => {
+        if (result.migrated && result.count > 0) {
+          showToast(`Migrated ${result.count} local inquiries to Cloud Firestore`, 'success');
+        }
+      })
+      .catch((err) => {
+        console.warn('[Firestore] Migration check warning:', err);
+      });
+
+    syncUserProfile(user).catch((err) => {
+      console.warn('[Firestore] User profile sync warning:', err);
+    });
 
     return () => {
       unsubInquiries();

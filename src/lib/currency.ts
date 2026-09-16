@@ -38,6 +38,7 @@ export function calculateInquiryPricing(params: {
   domesticShippingRmb?: number;
   marginPercent: number;
   marginFixedUsd?: number;
+  marginTotalDealUsd?: number;
   usdToRmbRate: number;
 }): {
   unitCostRmb: number;
@@ -58,31 +59,56 @@ export function calculateInquiryPricing(params: {
   const domShip = Math.max(0, !isNaN(Number(params.domesticShippingRmb)) && isFinite(Number(params.domesticShippingRmb)) ? Number(params.domesticShippingRmb) : 0);
   const rate = params.usdToRmbRate > 0 && !isNaN(params.usdToRmbRate) ? params.usdToRmbRate : 7.25;
   const marginPct = !isNaN(Number(params.marginPercent)) ? Number(params.marginPercent) : 0;
-  const marginFixed = !isNaN(Number(params.marginFixedUsd)) ? Number(params.marginFixedUsd) : 0;
 
   // Total sourcing cost in RMB per unit (product price + allocated domestic shipping)
   const unitCostRmb = p1688 + domShip / qty;
   const unitCostUsd = unitCostRmb / rate;
 
-  // Client Unit Price calculation without premature 2-decimal truncation
-  // Preserve micro-cents for unit pricing (e.g., $0.0495 or $0.00125)
-  const rawClientUnitPriceUsd = unitCostUsd * (1 + marginPct / 100) + marginFixed;
-  
-  // Clean rounding to 6 decimals to support micro-values while eliminating JS float drift
-  const clientUnitPriceUsd = Math.round(rawClientUnitPriceUsd * 1000000) / 1000000;
-  const clientUnitPriceRmb = Math.round(clientUnitPriceUsd * rate * 1000000) / 1000000;
-
-  const profitPerUnitUsd = Math.round((clientUnitPriceUsd - unitCostUsd) * 1000000) / 1000000;
-  const profitPerUnitRmb = Math.round(profitPerUnitUsd * rate * 1000000) / 1000000;
-
+  let clientUnitPriceUsd: number;
+  let clientUnitPriceRmb: number;
+  let profitPerUnitUsd: number;
+  let profitPerUnitRmb: number;
   const totalCostUsd = Math.round(unitCostUsd * qty * 100) / 100;
   const totalCostRmb = Math.round(unitCostRmb * qty * 100) / 100;
+  let totalQuotationUsd: number;
+  let totalQuotationRmb: number;
+  let estimatedProfitUsd: number;
+  let estimatedProfitRmb: number;
 
-  const totalQuotationUsd = Math.round(clientUnitPriceUsd * qty * 100) / 100;
-  const totalQuotationRmb = Math.round(totalQuotationUsd * rate * 100) / 100;
+  if (params.marginTotalDealUsd !== undefined && params.marginTotalDealUsd !== null && !isNaN(Number(params.marginTotalDealUsd)) && Number(params.marginTotalDealUsd) > 0) {
+    // Exact whole-deal lump sum profit
+    const dealUsd = Number(params.marginTotalDealUsd);
+    estimatedProfitUsd = dealUsd;
+    estimatedProfitRmb = Math.round(dealUsd * rate * 100) / 100;
 
-  const estimatedProfitUsd = Math.round((totalQuotationUsd - totalCostUsd) * 100) / 100;
-  const estimatedProfitRmb = Math.round(estimatedProfitUsd * rate * 100) / 100;
+    profitPerUnitUsd = Math.round((dealUsd / qty) * 1000000) / 1000000;
+    profitPerUnitRmb = Math.round(profitPerUnitUsd * rate * 1000000) / 1000000;
+
+    const rawClientUnitPriceUsd = unitCostUsd + (dealUsd / qty);
+    clientUnitPriceUsd = Math.round(rawClientUnitPriceUsd * 1000000) / 1000000;
+    clientUnitPriceRmb = Math.round(clientUnitPriceUsd * rate * 1000000) / 1000000;
+
+    totalQuotationUsd = Math.round((totalCostUsd + dealUsd) * 100) / 100;
+    totalQuotationRmb = Math.round(totalQuotationUsd * rate * 100) / 100;
+  } else {
+    const marginFixed = !isNaN(Number(params.marginFixedUsd)) ? Number(params.marginFixedUsd) : 0;
+    // Client Unit Price calculation without premature 2-decimal truncation
+    // Preserve micro-cents for unit pricing (e.g., $0.0495 or $0.00125)
+    const rawClientUnitPriceUsd = unitCostUsd * (1 + marginPct / 100) + marginFixed;
+    
+    // Clean rounding to 6 decimals to support micro-values while eliminating JS float drift
+    clientUnitPriceUsd = Math.round(rawClientUnitPriceUsd * 1000000) / 1000000;
+    clientUnitPriceRmb = Math.round(clientUnitPriceUsd * rate * 1000000) / 1000000;
+
+    profitPerUnitUsd = Math.round((clientUnitPriceUsd - unitCostUsd) * 1000000) / 1000000;
+    profitPerUnitRmb = Math.round(profitPerUnitUsd * rate * 1000000) / 1000000;
+
+    totalQuotationUsd = Math.round(clientUnitPriceUsd * qty * 100) / 100;
+    totalQuotationRmb = Math.round(totalQuotationUsd * rate * 100) / 100;
+
+    estimatedProfitUsd = Math.round((totalQuotationUsd - totalCostUsd) * 100) / 100;
+    estimatedProfitRmb = Math.round(estimatedProfitUsd * rate * 100) / 100;
+  }
 
   return {
     unitCostRmb: Math.round(unitCostRmb * 1000000) / 1000000,
@@ -173,9 +199,19 @@ export function formatCurrency(
     GBP: '£',
   };
   const symbol = symbols[currency] || '$';
-  return `${symbol}${Number(amount || 0).toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+  const num = !isNaN(Number(amount)) && isFinite(Number(amount)) ? Number(amount) : 0;
+  const absNum = Math.abs(num);
+
+  let minDec = 2;
+  let maxDec = 2;
+  if (absNum > 0 && absNum < 0.01) {
+    minDec = 3;
+    maxDec = 4;
+  }
+
+  return `${symbol}${num.toLocaleString('en-US', {
+    minimumFractionDigits: minDec,
+    maximumFractionDigits: maxDec,
   })}`;
 }
 

@@ -10,7 +10,8 @@ import { Customer } from '../types';
 
 export function subscribeToCustomers(
   userId: string,
-  onData: (customers: Customer[]) => void
+  onData: (customers: Customer[]) => void,
+  onError?: (error: Error) => void
 ): () => void {
   const uid = typeof userId === 'string' ? userId : (userId as any)?.uid ? String((userId as any).uid) : '';
   if (!uid) return () => {};
@@ -29,6 +30,7 @@ export function subscribeToCustomers(
     },
     (error) => {
       handleFirestoreError(error, OperationType.LIST, path);
+      if (onError) onError(error);
     }
   );
 }

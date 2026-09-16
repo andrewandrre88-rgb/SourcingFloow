@@ -17,15 +17,6 @@ import firebaseConfig from '../../firebase-applet-config.json';
 export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 
-// Configure local persistence (local storage preferred so user stays signed in on custom domain)
-try {
-  setPersistence(auth, browserLocalPersistence).catch(() => {
-    setPersistence(auth, inMemoryPersistence).catch(() => {});
-  });
-} catch (e) {
-  console.warn('Failed to set persistence:', e);
-}
-
 // Provider with standard Google Auth
 export const provider = new GoogleAuthProvider();
 provider.setCustomParameters({

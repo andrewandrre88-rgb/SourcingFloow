@@ -38,6 +38,8 @@ export interface HelperCommission {
   notes?: string; // Optional note
 }
 
+export type MarginMode = 'percent' | 'fixed_usd' | 'fixed_rmb' | 'deal_usd' | 'deal_rmb';
+
 export interface InquiryItem {
   id: string; // Unique ID (e.g. INQ-2026-001 or UUID)
   inquiryNumber: string; // e.g. INQ-1001
@@ -76,6 +78,8 @@ export interface InquiryItem {
   selectedQuoteId?: string; // ID of the winning quote
   marginPercent: number; // Margin % (e.g. 15, 20, 25)
   marginFixedUsd?: number; // Optional fixed margin per unit in USD ($)
+  marginMode?: MarginMode; // Profit mode ('percent', 'fixed_usd', 'fixed_rmb', 'deal_usd', 'deal_rmb')
+  marginDealTotal?: number; // Total profit for the entire deal (in USD or RMB)
   clientUnitPriceUsd: number; // Computed or manual client unit price ($)
   totalQuotationUsd: number; // Total client quotation ($)
   estimatedProfitUsd: number; // Total profit/margin for the agent ($)

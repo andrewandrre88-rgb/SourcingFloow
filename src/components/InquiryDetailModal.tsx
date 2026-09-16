@@ -631,13 +631,34 @@ export const InquiryDetailModal: React.FC<InquiryDetailModalProps> = ({
               <div className="p-3 bg-emerald-50/70 rounded-lg border border-emerald-200">
                 <div className="text-[10px] font-bold uppercase text-emerald-700 flex items-center gap-1">
                   <TrendingUp className="w-3 h-3 text-emerald-600" />
-                  <span>Gross Margin</span>
+                  <span>
+                    {item.marginMode === 'deal_usd' || item.marginMode === 'deal_rmb'
+                      ? 'Whole Deal Profit'
+                      : 'Gross Margin'}
+                  </span>
                 </div>
                 <div className="text-base font-bold font-mono text-emerald-700 mt-0.5">
-                  +{item.marginPercent}%
+                  {item.marginMode === 'deal_usd'
+                    ? `+${formatCurrency(item.marginDealTotal ?? item.estimatedProfitUsd ?? 0, 'USD')}`
+                    : item.marginMode === 'deal_rmb'
+                    ? `+¥${formatCurrency(item.marginDealTotal ?? ((item.estimatedProfitUsd || 0) * rate), 'RMB')}`
+                    : item.marginFixedUsd && item.marginFixedUsd > 0 && !item.marginPercent
+                    ? `+${formatUnitPrice(item.marginFixedUsd, 'USD')}/pc`
+                    : `+${item.marginPercent || 0}%`}
                 </div>
                 <div className="text-[11px] text-emerald-700 font-mono font-medium mt-0.5">
-                  +{formatCurrency(item.estimatedProfitUsd || 0, 'USD')} <span className="text-emerald-600/80 font-normal">(¥{formatCurrency((item.estimatedProfitUsd || 0) * rate, 'RMB')})</span>
+                  {item.marginMode === 'deal_usd' || item.marginMode === 'deal_rmb' ? (
+                    <>
+                      +{formatUnitPrice((item.estimatedProfitUsd || 0) / Math.max(1, Number(item.quantity) || 1), 'USD')}/pc • +{formatCurrency(item.estimatedProfitUsd || 0, 'USD')}
+                    </>
+                  ) : (
+                    <>
+                      +{formatCurrency(item.estimatedProfitUsd || 0, 'USD')}{' '}
+                      <span className="text-emerald-600/80 font-normal">
+                        (¥{formatCurrency((item.estimatedProfitUsd || 0) * rate, 'RMB')})
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
 

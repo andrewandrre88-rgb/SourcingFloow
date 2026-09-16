@@ -435,8 +435,20 @@ export const InquiryTable: React.FC<InquiryTableProps> = ({
 
                     {/* Add Margin & Net Take-Home */}
                     <td className="py-2.5 px-4 whitespace-nowrap text-right">
-                      <div className="text-xs text-green-600 font-bold">
-                        +{item.marginPercent}%
+                      <div className={`text-xs font-bold ${
+                        item.marginMode === 'deal_usd' || item.marginMode === 'deal_rmb'
+                          ? 'text-amber-600'
+                          : item.marginFixedUsd && item.marginFixedUsd > 0 && !item.marginPercent
+                          ? 'text-indigo-600'
+                          : 'text-green-600'
+                      }`}>
+                        {item.marginMode === 'deal_usd'
+                          ? `+${formatCurrency(item.marginDealTotal ?? profitUsd, 'USD')} Deal`
+                          : item.marginMode === 'deal_rmb'
+                          ? `+¥${formatCurrency(item.marginDealTotal ?? (profitUsd * usdToRmbRate), 'RMB')} Deal`
+                          : item.marginFixedUsd && item.marginFixedUsd > 0 && !item.marginPercent
+                          ? `+${formatUnitPrice(item.marginFixedUsd, 'USD')}/pc`
+                          : `+${item.marginPercent || 0}%`}
                       </div>
                       <div className="text-[10px] text-slate-500 font-mono">
                         {currencyView === 'RMB' ? (
