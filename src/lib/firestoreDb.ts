@@ -169,8 +169,22 @@ export function subscribeToUserInquiries(
           netAgentProfitUsd: data.netAgentProfitUsd !== undefined ? Number(data.netAgentProfitUsd) : undefined,
           orderStatus: (data.orderStatus as OrderStatus) || 'New Inquiry',
           notes: data.notes || '',
+          orderIndex: data.orderIndex !== undefined && data.orderIndex !== null ? Number(data.orderIndex) : undefined,
+          isPinned: data.isPinned !== undefined ? Boolean(data.isPinned) : undefined,
           updatedAt: data.updatedAt || new Date().toISOString(),
         });
+      });
+
+      // Sort with custom order priority (pinned first, then orderIndex, then newest date)
+      items.sort((a, b) => {
+        if (a.isPinned && !b.isPinned) return -1;
+        if (!a.isPinned && b.isPinned) return 1;
+        if (a.orderIndex !== undefined && b.orderIndex !== undefined) {
+          return a.orderIndex - b.orderIndex;
+        }
+        if (a.orderIndex !== undefined) return -1;
+        if (b.orderIndex !== undefined) return 1;
+        return new Date(b.updatedAt || b.date || 0).getTime() - new Date(a.updatedAt || a.date || 0).getTime();
       });
 
       onData(items);
@@ -270,11 +284,39 @@ export async function saveInquiryToFirestore(
     }));
   }
 
+  if (inquiry.orderIndex !== undefined && inquiry.orderIndex !== null) cleanPayload.orderIndex = safeNum(inquiry.orderIndex);
+  if (inquiry.isPinned !== undefined) cleanPayload.isPinned = Boolean(inquiry.isPinned);
+
   try {
     await setDoc(inquiryRef, cleanPayload, { merge: true });
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
     throw error;
+  }
+}
+
+/**
+ * Batch update order of inquiries in Firestore
+ * Persists the user's custom drag-and-drop order across all devices
+ */
+export async function updateInquiriesOrderInFirestore(
+  userId: string,
+  orderedInquiryIds: string[]
+): Promise<void> {
+  const uid = typeof userId === 'string' ? userId : (userId as any)?.uid ? String((userId as any).uid) : '';
+  if (!uid || !orderedInquiryIds || orderedInquiryIds.length === 0) return;
+
+  const batch = writeBatch(db);
+  orderedInquiryIds.forEach((id, index) => {
+    const docRef = doc(db, 'users', uid, 'inquiries', id);
+    batch.set(docRef, { orderIndex: index, updatedAt: new Date().toISOString() }, { merge: true });
+  });
+
+  try {
+    await batch.commit();
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `users/${uid}/inquiries`);
+    console.error('Failed to update inquiries order in Firestore:', error);
   }
 }
 

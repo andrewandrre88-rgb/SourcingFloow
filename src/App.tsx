@@ -13,6 +13,7 @@ import {
   subscribeToUserExchangeRates,
   saveExchangeRatesToFirestore,
   migrateLocalDataToFirestoreIfEmpty,
+  updateInquiriesOrderInFirestore,
 } from './lib/firestoreDb';
 import {
   getSavedExchangeRates,
@@ -278,6 +279,35 @@ export default function App() {
         setSyncState((prev) => ({ ...prev, isSyncing: false }));
       } catch (error: any) {
         console.error('Failed to save duplicated inquiry to Firestore:', error);
+      }
+    }
+  };
+
+  const handleReorderInquiries = async (reorderedItems: InquiryItem[]) => {
+    // 1. Assign sequential orderIndex so priority order is strictly maintained
+    const withOrder = reorderedItems.map((item, idx) => ({
+      ...item,
+      orderIndex: idx,
+    }));
+
+    setInquiries(withOrder);
+
+    // 2. Persist to localStorage immediately for instant offline/reload access
+    try {
+      localStorage.setItem(STORAGE_KEY_LOCAL_INQUIRIES, JSON.stringify(withOrder));
+    } catch (e) {
+      console.error('Failed to save reordered inquiries to localStorage:', e);
+    }
+
+    // 3. Persist to Firestore if user is authenticated
+    if (user && user.uid) {
+      try {
+        setSyncState((prev) => ({ ...prev, isSyncing: true }));
+        await updateInquiriesOrderInFirestore(user.uid, withOrder.map((i) => i.id));
+        setSyncState((prev) => ({ ...prev, isSyncing: false }));
+      } catch (error: any) {
+        console.error('Failed to sync reordered inquiries with Firestore:', error);
+        setSyncState((prev) => ({ ...prev, isSyncing: false }));
       }
     }
   };
@@ -660,6 +690,7 @@ export default function App() {
               onStatusChange={handleStatusChange}
               onQuickShare={(item) => setItemToShare(item)}
               onDuplicate={handleDuplicateInquiry}
+              onReorder={handleReorderInquiries}
             />
           </>
         ) : currentView === 'customers' ? (

@@ -44,6 +44,8 @@ export interface InquiryItem {
   id: string; // Unique ID (e.g. INQ-2026-001 or UUID)
   inquiryNumber: string; // e.g. INQ-1001
   date: string; // YYYY-MM-DD
+  orderIndex?: number; // Custom position for drag-and-drop order (0 = top / most important)
+  isPinned?: boolean; // Pinned to the top
   customerName: string; // Client / Company Name
   customerContact?: string; // WhatsApp / Email
   whatsapp?: string; // Client WhatsApp number

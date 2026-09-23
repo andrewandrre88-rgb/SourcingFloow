@@ -18,6 +18,10 @@ import {
   Box,
   Target,
   Receipt,
+  GripVertical,
+  ArrowUpToLine,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { InquiryItem, OrderStatus, CurrencyViewMode, Customer, ExchangeRates } from '../types';
 import {
@@ -65,6 +69,7 @@ interface InquiryTableProps {
   onStatusChange: (item: InquiryItem, newStatus: OrderStatus) => void;
   onQuickShare: (item: InquiryItem) => void;
   onDuplicate: (item: InquiryItem) => void;
+  onReorder?: (newInquiries: InquiryItem[]) => void;
 }
 
 const ALL_STATUSES: OrderStatus[] = [
@@ -92,11 +97,99 @@ export const InquiryTable: React.FC<InquiryTableProps> = ({
   onStatusChange,
   onQuickShare,
   onDuplicate,
+  onReorder,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
-  const [sortField, setSortField] = useState<keyof InquiryItem>('date');
+  const [sortField, setSortField] = useState<keyof InquiryItem | 'custom'>('custom');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ id: string; position: 'before' | 'after' } | null>(null);
+
+  // Reorder inquiries: Move chosen inquiry directly to the top (Priority #1)
+  const handleMoveToTop = (id: string) => {
+    const currentList = [...inquiries];
+    const idx = currentList.findIndex((i) => i.id === id);
+    if (idx <= 0) return;
+    const [moved] = currentList.splice(idx, 1);
+    currentList.unshift(moved);
+    setSortField('custom');
+    if (onReorder) {
+      onReorder(currentList);
+    }
+  };
+
+  // Move inquiry up or down by relative delta (-1 for up, +1 for down)
+  const handleMoveByOffset = (id: string, delta: number) => {
+    const currentList = [...inquiries];
+    const idx = currentList.findIndex((i) => i.id === id);
+    if (idx < 0) return;
+    const targetIdx = idx + delta;
+    if (targetIdx < 0 || targetIdx >= currentList.length) return;
+    const [moved] = currentList.splice(idx, 1);
+    currentList.splice(targetIdx, 0, moved);
+    setSortField('custom');
+    if (onReorder) {
+      onReorder(currentList);
+    }
+  };
+
+  // Reorder inquiries on drag & drop
+  const handleReorder = (fromId: string, toId: string, position: 'before' | 'after') => {
+    if (fromId === toId) return;
+    const currentList = [...inquiries];
+    const fromIdx = currentList.findIndex((i) => i.id === fromId);
+    const toIdx = currentList.findIndex((i) => i.id === toId);
+    if (fromIdx < 0 || toIdx < 0) return;
+
+    const [moved] = currentList.splice(fromIdx, 1);
+    let insertIdx = currentList.findIndex((i) => i.id === toId);
+    if (position === 'after') {
+      insertIdx += 1;
+    }
+    currentList.splice(insertIdx, 0, moved);
+    setSortField('custom');
+    if (onReorder) {
+      onReorder(currentList);
+    }
+  };
+
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    setDraggedId(id);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', id);
+  };
+
+  const handleDragOverRow = (e: React.DragEvent, id: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (!draggedId || draggedId === id) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const position: 'before' | 'after' = e.clientY < midY ? 'before' : 'after';
+    if (!dropTarget || dropTarget.id !== id || dropTarget.position !== position) {
+      setDropTarget({ id, position });
+    }
+  };
+
+  const handleDropOnRow = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    if (!draggedId || draggedId === targetId) {
+      setDraggedId(null);
+      setDropTarget(null);
+      return;
+    }
+
+    handleReorder(draggedId, targetId, dropTarget?.position || 'before');
+    setDraggedId(null);
+    setDropTarget(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedId(null);
+    setDropTarget(null);
+  };
 
   // Resolves WhatsApp contact and preformatted inquiry quote message
   const getInquiryWhatsAppDetails = (item: InquiryItem) => {
@@ -178,6 +271,12 @@ Please let us know if you need any adjustments or would like to proceed with a s
 
   // Sort inquiries
   const sorted = [...filtered].sort((a, b) => {
+    if (sortField === 'custom') {
+      const idxA = inquiries.findIndex((i) => i.id === a.id);
+      const idxB = inquiries.findIndex((i) => i.id === b.id);
+      return idxA - idxB;
+    }
+
     let aVal = a[sortField] ?? '';
     let bVal = b[sortField] ?? '';
 
@@ -191,7 +290,11 @@ Please let us know if you need any adjustments or would like to proceed with a s
     return 0;
   });
 
-  const handleSort = (field: keyof InquiryItem) => {
+  const handleSort = (field: keyof InquiryItem | 'custom') => {
+    if (field === 'custom') {
+      setSortField('custom');
+      return;
+    }
     if (sortField === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     } else {
@@ -244,25 +347,47 @@ Please let us know if you need any adjustments or would like to proceed with a s
           />
         </div>
 
-        {/* Status Filter Tabs */}
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5 whitespace-nowrap shrink-0">
-            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
-            <span>Filter:</span>
-          </span>
-          <select
-            id="inquiry-status-filter-select"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="flex-1 sm:flex-none bg-white border border-slate-300 text-xs text-slate-700 rounded-lg sm:rounded px-3 py-2.5 sm:py-1.5 focus:outline-none focus:border-indigo-500 cursor-pointer shadow-xs font-semibold"
-          >
-            <option value="All">All Inquiries ({inquiries.length})</option>
-            {ALL_STATUSES.map((st) => (
-              <option key={st} value={st}>
-                {st} ({inquiries.filter((i) => i.orderStatus === st).length})
-              </option>
-            ))}
-          </select>
+        {/* Status Filter Tabs & Reorder Priority indicator */}
+        <div className="flex items-center gap-2.5 w-full sm:w-auto flex-wrap justify-between sm:justify-end">
+          {sortField === 'custom' ? (
+            <div
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold select-none"
+              title="Custom priority ordering is active. Drag rows to reorder or click 'Move to Top'."
+            >
+              <GripVertical className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+              <span>Priority Order (Drag to Top)</span>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setSortField('custom')}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold shadow-2xs transition cursor-pointer"
+              title="Click to restore your custom drag-and-drop priority order"
+            >
+              <GripVertical className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <span>Reset to Priority Order</span>
+            </button>
+          )}
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5 whitespace-nowrap shrink-0">
+              <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
+              <span>Filter:</span>
+            </span>
+            <select
+              id="inquiry-status-filter-select"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="flex-1 sm:flex-none bg-white border border-slate-300 text-xs text-slate-700 rounded-lg sm:rounded px-3 py-2.5 sm:py-1.5 focus:outline-none focus:border-indigo-500 cursor-pointer shadow-xs font-semibold"
+            >
+              <option value="All">All Inquiries ({inquiries.length})</option>
+              {ALL_STATUSES.map((st) => (
+                <option key={st} value={st}>
+                  {st} ({inquiries.filter((i) => i.orderStatus === st).length})
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -272,12 +397,26 @@ Please let us know if you need any adjustments or would like to proceed with a s
           <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 font-bold select-none border-b border-slate-200">
             <tr>
               <th
-                className="py-2.5 px-4 cursor-pointer hover:text-slate-900 transition whitespace-nowrap"
-                onClick={() => handleSort('inquiryNumber')}
+                className="py-2.5 px-3 sm:px-4 cursor-pointer hover:text-slate-900 transition whitespace-nowrap"
+                onClick={() => {
+                  if (sortField === 'custom') {
+                    handleSort('inquiryNumber');
+                  } else {
+                    setSortField('custom');
+                  }
+                }}
+                title={sortField === 'custom' ? 'Priority order active. Click to sort alphabetically by Inquiry #.' : 'Click to activate Custom Drag Priority Order.'}
               >
-                <div className="flex items-center gap-1">
-                  <span>Inquiry #</span>
-                  <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                <div className="flex items-center gap-1.5">
+                  <GripVertical className="w-3.5 h-3.5 text-indigo-500" />
+                  <span># Priority / Inquiry</span>
+                  {sortField === 'custom' ? (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-100 text-indigo-700 normal-case tracking-normal ml-0.5">
+                      Drag Active
+                    </span>
+                  ) : (
+                    <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                  )}
                 </div>
               </th>
               <th
@@ -363,7 +502,7 @@ Please let us know if you need any adjustments or would like to proceed with a s
                 </td>
               </tr>
             ) : (
-              sorted.map((item) => {
+              sorted.map((item, index) => {
                 const unitCostUsd = (item.price1688Rmb || 0) / (usdToRmbRate || 7.25);
                 const profitUsd = item.estimatedProfitUsd || 0;
                 const helpersCommissionUsd = calculateTotalHelperCommissions(
@@ -378,23 +517,87 @@ Please let us know if you need any adjustments or would like to proceed with a s
                 const netProfitUsd = Number((profitUsd - helpersCommissionUsd - expensesUsd).toFixed(2));
                 const helperCount = item.helperCommissions?.length || 0;
                 const waDetails = getInquiryWhatsAppDetails(item);
+                const isBeingDragged = draggedId === item.id;
+                const isDropTarget = dropTarget?.id === item.id;
 
                 return (
                   <tr
                     key={item.id}
                     id={`inquiry-row-${item.id}`}
-                    className="hover:bg-slate-50 bg-white transition-colors group"
+                    draggable={true}
+                    onDragStart={(e) => handleDragStart(e, item.id)}
+                    onDragOver={(e) => handleDragOverRow(e, item.id)}
+                    onDrop={(e) => handleDropOnRow(e, item.id)}
+                    onDragEnd={handleDragEnd}
+                    className={`transition-all duration-150 group ${
+                      isBeingDragged
+                        ? 'opacity-40 bg-indigo-50/70 ring-2 ring-indigo-400 ring-dashed'
+                        : isDropTarget
+                        ? dropTarget.position === 'before'
+                          ? 'border-t-4 border-t-indigo-600 bg-indigo-50/60 shadow-sm'
+                          : 'border-b-4 border-b-indigo-600 bg-indigo-50/60 shadow-sm'
+                        : 'hover:bg-slate-50 bg-white'
+                    }`}
                   >
-                    {/* Inquiry Number & Date */}
-                    <td className="py-2.5 px-4 whitespace-nowrap">
-                      <button
-                        onClick={() => onView(item)}
-                        className="font-mono font-semibold text-indigo-600 hover:text-indigo-800 text-xs text-left hover:underline transition cursor-pointer"
-                        title="Click to view full inquiry details"
-                      >
-                        {item.inquiryNumber}
-                      </button>
-                      <div className="text-[10px] text-slate-400">{item.date}</div>
+                    {/* Drag Handle, Priority Rank, Move to Top, Inquiry Number & Date */}
+                    <td className="py-2.5 px-3 sm:px-4 whitespace-nowrap">
+                      <div className="flex items-center gap-1.5">
+                        {/* Drag Handle */}
+                        <div
+                          draggable={true}
+                          onDragStart={(e) => handleDragStart(e, item.id)}
+                          className="cursor-grab active:cursor-grabbing p-1 -ml-1 text-slate-300 group-hover:text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors shrink-0"
+                          title="Click and drag row to adjust order — drop at top to make #1 priority"
+                        >
+                          <GripVertical className="w-4 h-4" />
+                        </div>
+
+                        {/* Priority Rank Badge */}
+                        <span
+                          className={`inline-flex items-center justify-center min-w-[24px] h-5 px-1.5 rounded-full text-[10px] font-bold shrink-0 ${
+                            index === 0
+                              ? 'bg-amber-100 text-amber-900 border border-amber-300 font-extrabold shadow-2xs'
+                              : index === 1
+                              ? 'bg-slate-200 text-slate-800'
+                              : index === 2
+                              ? 'bg-orange-100 text-orange-900'
+                              : 'bg-slate-100 text-slate-500'
+                          }`}
+                          title={index === 0 ? 'Top Priority (#1)' : `Priority #${index + 1}`}
+                        >
+                          #{index + 1}
+                        </span>
+
+                        {/* 1-Click Move to Top button */}
+                        {index > 0 ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMoveToTop(item.id);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 focus:opacity-100 p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition cursor-pointer shrink-0"
+                            title="Move directly to top (#1 Priority)"
+                          >
+                            <ArrowUpToLine className="w-3.5 h-3.5" />
+                          </button>
+                        ) : (
+                          <span className="w-5 shrink-0" />
+                        )}
+
+                        {/* Inquiry Number & Date */}
+                        <div className="flex flex-col min-w-0">
+                          <button
+                            type="button"
+                            onClick={() => onView(item)}
+                            className="font-mono font-semibold text-indigo-600 hover:text-indigo-800 text-xs text-left hover:underline transition cursor-pointer truncate"
+                            title="Click to view full inquiry details"
+                          >
+                            {item.inquiryNumber}
+                          </button>
+                          <div className="text-[10px] text-slate-400">{item.date}</div>
+                        </div>
+                      </div>
                     </td>
 
                     {/* Customer Name */}
@@ -660,6 +863,21 @@ Please let us know if you need any adjustments or would like to proceed with a s
                     {/* Actions */}
                     <td className="py-2.5 px-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end space-x-0.5">
+                        {/* Move to Top */}
+                        {index > 0 && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMoveToTop(item.id);
+                            }}
+                            title="Move directly to top (#1 Priority)"
+                            className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition cursor-pointer"
+                          >
+                            <ArrowUpToLine className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+
                         {/* Open directly in WhatsApp App */}
                         <a
                           id={`inquiry-whatsapp-btn-${item.id}`}
@@ -747,7 +965,7 @@ Please let us know if you need any adjustments or would like to proceed with a s
             </div>
           </div>
         ) : (
-          sorted.map((item) => {
+          sorted.map((item, index) => {
             const unitCostUsd = (item.price1688Rmb || 0) / (usdToRmbRate || 7.25);
             const profitUsd = item.estimatedProfitUsd || 0;
             const helpersCommissionUsd = calculateTotalHelperCommissions(
@@ -768,17 +986,43 @@ Please let us know if you need any adjustments or would like to proceed with a s
                 key={item.id}
                 className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs hover:border-indigo-200 transition flex flex-col gap-3"
               >
-                {/* Header: Inquiry + Status */}
+                {/* Header: Priority # + Inquiry + Move to Top + Status */}
                 <div className="flex justify-between items-start gap-2">
                   <div
                     onClick={() => onView(item)}
                     className="cursor-pointer group flex-1 min-w-0"
                     title="Click to view full inquiry details"
                   >
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span
+                        className={`inline-flex items-center justify-center min-w-[22px] h-5 px-1.5 rounded-full text-[10px] font-bold ${
+                          index === 0
+                            ? 'bg-amber-100 text-amber-900 border border-amber-300 font-extrabold shadow-2xs'
+                            : index === 1
+                            ? 'bg-slate-200 text-slate-800'
+                            : 'bg-slate-100 text-slate-500'
+                        }`}
+                        title={`Priority #${index + 1}`}
+                      >
+                        #{index + 1}
+                      </span>
                       <span className="font-mono font-bold text-indigo-600 text-sm group-hover:underline">
                         {item.inquiryNumber}
                       </span>
+                      {index > 0 && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMoveToTop(item.id);
+                          }}
+                          className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded transition cursor-pointer"
+                          title="Move directly to top (#1 Priority)"
+                        >
+                          <ArrowUpToLine className="w-3 h-3" />
+                          <span>To Top</span>
+                        </button>
+                      )}
                     </div>
                     <div className="text-[11px] text-slate-400 mt-0.5">{item.date}</div>
                   </div>
@@ -997,6 +1241,54 @@ Please let us know if you need any adjustments or would like to proceed with a s
                       <Trash2 className="w-3.5 h-3.5 shrink-0 text-rose-600" />
                       <span>Delete</span>
                     </button>
+                  </div>
+
+                  {/* Row 3: Priority Reordering (Mobile) */}
+                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      Order Rank: <strong className="text-slate-800">#{index + 1}</strong>
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {index > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleMoveToTop(item.id)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-semibold transition cursor-pointer"
+                          title="Move directly to top (#1 Priority)"
+                        >
+                          <ArrowUpToLine className="w-3 h-3" />
+                          <span>To Top</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        disabled={index === 0}
+                        onClick={() => handleMoveByOffset(item.id, -1)}
+                        className={`p-1 rounded border text-xs transition ${
+                          index === 0
+                            ? 'text-slate-300 border-slate-200 cursor-not-allowed bg-slate-50'
+                            : 'text-slate-600 border-slate-300 hover:bg-slate-100 cursor-pointer'
+                        }`}
+                        title="Move Up"
+                        aria-label="Move Up"
+                      >
+                        <ArrowUp className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={index === sorted.length - 1}
+                        onClick={() => handleMoveByOffset(item.id, 1)}
+                        className={`p-1 rounded border text-xs transition ${
+                          index === sorted.length - 1
+                            ? 'text-slate-300 border-slate-200 cursor-not-allowed bg-slate-50'
+                            : 'text-slate-600 border-slate-300 hover:bg-slate-100 cursor-pointer'
+                        }`}
+                        title="Move Down"
+                        aria-label="Move Down"
+                      >
+                        <ArrowDown className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
