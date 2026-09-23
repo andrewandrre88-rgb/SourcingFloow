@@ -647,6 +647,7 @@ export default function App() {
             <StatsBar inquiries={inquiries} exchangeRates={exchangeRates} currencyView={currencyView} />
             <InquiryTable 
               inquiries={inquiries}
+              customers={customers}
               exchangeRates={exchangeRates}
               usdToRmbRate={exchangeRates.USD_TO_RMB}
               currencyView={currencyView}

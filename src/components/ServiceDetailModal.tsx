@@ -362,8 +362,55 @@ ${service.description}
             </div>
           </div>
 
-          {/* On-Ground Travel & Factory Relocation Expenses */}
-          {service.travelExpenses && (
+          {/* Service Out-of-Pocket Expenses / Travel Costs */}
+          {service.serviceExpenses && service.serviceExpenses.length > 0 ? (
+            <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
+              <div className="px-4 py-2.5 bg-slate-100/80 border-b border-slate-200 font-bold text-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5 text-xs">
+                  <Receipt className="w-4 h-4 text-emerald-600" />
+                  Service Out-of-Pocket Expenses ({service.serviceExpenses.length})
+                </span>
+                <span className="text-xs font-bold font-mono text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full self-start sm:self-auto">
+                  Total Expenses: -{formatCurrency(service.totalTravelCostUsd || 0, 'USD')} (-¥{formatCurrency(service.totalTravelCostRmb || 0, 'RMB')})
+                </span>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {service.serviceExpenses.map((exp, idx) => (
+                  <div key={exp.id || idx} className="p-3 hover:bg-slate-50/70 transition flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                    <div className="space-y-0.5">
+                      <div className="font-semibold text-slate-800 flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <span>{exp.title || 'Service Cost'}</span>
+                        {exp.hasFapiao && (
+                          <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.2 rounded font-medium">
+                            发票 Fapiao
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-500 pl-6 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                        {exp.date && <span>Date: {exp.date}</span>}
+                        {exp.supplierOrPayee && <span>Payee: {exp.supplierOrPayee}</span>}
+                        {exp.paymentMethod && <span>Via: {exp.paymentMethod}</span>}
+                        {exp.notes && <span className="italic text-slate-400">({exp.notes})</span>}
+                      </div>
+                    </div>
+                    <div className="text-right sm:shrink-0 pl-6 sm:pl-0">
+                      <div className="font-mono font-bold text-slate-900 text-sm">
+                        {exp.currency === 'USD' ? '$' : '¥'}{Number(exp.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                      <div className="text-[10px] font-mono text-slate-400">
+                        {exp.currency === 'USD'
+                          ? `≈ ¥${((Number(exp.amount) || 0) * (service.totalTravelCostRmb && service.totalTravelCostUsd ? service.totalTravelCostRmb / service.totalTravelCostUsd : 7.23)).toFixed(2)}`
+                          : `≈ $${((Number(exp.amount) || 0) / (service.totalTravelCostRmb && service.totalTravelCostUsd ? service.totalTravelCostRmb / service.totalTravelCostUsd : 7.23)).toFixed(2)}`}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : service.travelExpenses && ((service.travelExpenses.transportCost || 0) + (service.travelExpenses.hotelCost || 0) + (service.travelExpenses.foodCost || 0) + (service.travelExpenses.otherCost || 0) > 0) ? (
             <div className="p-3.5 rounded-lg border border-amber-200 bg-amber-50/60 space-y-2.5">
               <div className="flex items-center justify-between">
                 <div className="text-[11px] font-bold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
@@ -423,7 +470,7 @@ ${service.description}
                 </div>
               )}
             </div>
-          )}
+          ) : null}
 
           {/* Assigned China Partner */}
           {service.assignedPartner && (

@@ -25,6 +25,9 @@ import {
   Utensils,
   Car,
   Receipt,
+  Plus,
+  Trash2,
+  Coins,
 } from 'lucide-react';
 import {
   ServiceRequest,
@@ -36,6 +39,7 @@ import {
   Customer,
   ExchangeRates,
   ExpenseItem,
+  InquiryExpense,
 } from '../types';
 import { formatCurrency } from '../lib/currency';
 
@@ -163,45 +167,92 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
 
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
 
-  const [travelExpenses, setTravelExpenses] = useState<{
-    transportCost: number;
-    hotelCost: number;
-    foodCost: number;
-    otherCost: number;
-    currency: CurrencyUnit;
-    notes: string;
-  }>({
-    transportCost: 0,
-    hotelCost: 0,
-    foodCost: 0,
-    otherCost: 0,
-    currency: 'RMB',
-    notes: '',
-  });
-
+  const [serviceExpenses, setServiceExpenses] = useState<InquiryExpense[]>([]);
   const [alsoLogToExpenses, setAlsoLogToExpenses] = useState<boolean>(true);
+
+  // Compute total expenses in USD and RMB
+  const totalExpenses = serviceExpenses.reduce(
+    (acc, exp) => {
+      const amt = Number(exp.amount) || 0;
+      if (exp.currency === 'USD') {
+        acc.usd += amt;
+        acc.rmb += amt * rate;
+      } else {
+        acc.rmb += amt;
+        acc.usd += amt / rate;
+      }
+      return acc;
+    },
+    { usd: 0, rmb: 0 }
+  );
 
   useEffect(() => {
     if (serviceToEdit) {
       setFormData(serviceToEdit);
-      if (serviceToEdit.travelExpenses) {
-        setTravelExpenses({
-          transportCost: serviceToEdit.travelExpenses.transportCost || 0,
-          hotelCost: serviceToEdit.travelExpenses.hotelCost || 0,
-          foodCost: serviceToEdit.travelExpenses.foodCost || 0,
-          otherCost: serviceToEdit.travelExpenses.otherCost || 0,
-          currency: serviceToEdit.travelExpenses.currency || 'RMB',
-          notes: serviceToEdit.travelExpenses.notes || '',
-        });
+      if (serviceToEdit.serviceExpenses && serviceToEdit.serviceExpenses.length > 0) {
+        setServiceExpenses(serviceToEdit.serviceExpenses);
+      } else if (serviceToEdit.travelExpenses) {
+        // Convert legacy travelExpenses fields to serviceExpenses if they exist
+        const legacy: InquiryExpense[] = [];
+        const curr = serviceToEdit.travelExpenses.currency || 'RMB';
+        if (serviceToEdit.travelExpenses.transportCost) {
+          legacy.push({
+            id: `leg_trans_${Date.now()}_1`,
+            title: 'Transport / Gaotie / Didi',
+            amount: serviceToEdit.travelExpenses.transportCost,
+            currency: curr,
+            amountRmb: curr === 'RMB' ? serviceToEdit.travelExpenses.transportCost : serviceToEdit.travelExpenses.transportCost * rate,
+            amountUsd: curr === 'USD' ? serviceToEdit.travelExpenses.transportCost : serviceToEdit.travelExpenses.transportCost / rate,
+            date: serviceToEdit.date,
+            supplierOrPayee: 'China Transport',
+            paymentMethod: 'WeChat Pay',
+            hasFapiao: true,
+          });
+        }
+        if (serviceToEdit.travelExpenses.hotelCost) {
+          legacy.push({
+            id: `leg_hotel_${Date.now()}_2`,
+            title: 'Hotel & Lodging',
+            amount: serviceToEdit.travelExpenses.hotelCost,
+            currency: curr,
+            amountRmb: curr === 'RMB' ? serviceToEdit.travelExpenses.hotelCost : serviceToEdit.travelExpenses.hotelCost * rate,
+            amountUsd: curr === 'USD' ? serviceToEdit.travelExpenses.hotelCost : serviceToEdit.travelExpenses.hotelCost / rate,
+            date: serviceToEdit.date,
+            supplierOrPayee: 'Hotel',
+            paymentMethod: 'WeChat Pay',
+            hasFapiao: true,
+          });
+        }
+        if (serviceToEdit.travelExpenses.foodCost) {
+          legacy.push({
+            id: `leg_food_${Date.now()}_3`,
+            title: 'Food & Daily Meals',
+            amount: serviceToEdit.travelExpenses.foodCost,
+            currency: curr,
+            amountRmb: curr === 'RMB' ? serviceToEdit.travelExpenses.foodCost : serviceToEdit.travelExpenses.foodCost * rate,
+            amountUsd: curr === 'USD' ? serviceToEdit.travelExpenses.foodCost : serviceToEdit.travelExpenses.foodCost / rate,
+            date: serviceToEdit.date,
+            paymentMethod: 'WeChat Pay',
+            hasFapiao: false,
+          });
+        }
+        if (serviceToEdit.travelExpenses.otherCost) {
+          legacy.push({
+            id: `leg_other_${Date.now()}_4`,
+            title: serviceToEdit.travelExpenses.notes || 'Other Relocation / Misc',
+            amount: serviceToEdit.travelExpenses.otherCost,
+            currency: curr,
+            amountRmb: curr === 'RMB' ? serviceToEdit.travelExpenses.otherCost : serviceToEdit.travelExpenses.otherCost * rate,
+            amountUsd: curr === 'USD' ? serviceToEdit.travelExpenses.otherCost : serviceToEdit.travelExpenses.otherCost / rate,
+            date: serviceToEdit.date,
+            notes: serviceToEdit.travelExpenses.notes,
+            paymentMethod: 'WeChat Pay',
+            hasFapiao: true,
+          });
+        }
+        setServiceExpenses(legacy);
       } else {
-        setTravelExpenses({
-          transportCost: 0,
-          hotelCost: 0,
-          foodCost: 0,
-          otherCost: 0,
-          currency: 'RMB',
-          notes: '',
-        });
+        setServiceExpenses([]);
       }
       const match = customers.find(
         (c) => c.name.toLowerCase() === (serviceToEdit.clientName || '').toLowerCase()
@@ -248,24 +299,17 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
-      setTravelExpenses({
-        transportCost: 0,
-        hotelCost: 0,
-        foodCost: 0,
-        otherCost: 0,
-        currency: 'RMB',
-        notes: '',
-      });
+      setServiceExpenses([]);
       setSelectedCustomerId('');
     }
   }, [serviceToEdit, isOpen, rate, existingServices, customers]);
 
-  // Recalculate profit whenever fee, cost, currency, rate, or travel expenses change
+  // Recalculate profit whenever fee, cost, currency, rate, or expenses change
   const updateFinancials = (
     fee: number,
     cost: number,
     currency: CurrencyUnit,
-    travel = travelExpenses
+    expensesList = serviceExpenses
   ) => {
     const rawNet = Math.max(0, fee - cost);
     let baseProfitUsd = rawNet;
@@ -276,23 +320,26 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
       baseProfitUsd = rawNet / rate;
     }
 
-    // Travel expenses calculations
-    const travelSum =
-      (Number(travel.transportCost) || 0) +
-      (Number(travel.hotelCost) || 0) +
-      (Number(travel.foodCost) || 0) +
-      (Number(travel.otherCost) || 0);
+    // Sum service expenses
+    let totalExpUsd = 0;
+    let totalExpRmb = 0;
+    expensesList.forEach((e) => {
+      const amt = Number(e.amount) || 0;
+      if (e.currency === 'USD') {
+        totalExpUsd += amt;
+        totalExpRmb += amt * rate;
+      } else {
+        totalExpRmb += amt;
+        totalExpUsd += amt / rate;
+      }
+    });
 
-    let travelCostRmb = travelSum;
-    let travelCostUsd = travelSum / rate;
-    if (travel.currency === 'USD') {
-      travelCostUsd = travelSum;
-      travelCostRmb = travelSum * rate;
+    // Convert expenses to quote currency to deduct from net profit
+    const expenseInQuoteCurrency = currency === 'RMB' ? totalExpRmb : totalExpExpUsdFallback(totalExpUsd);
+    function totalExpExpUsdFallback(val: number) {
+      return val;
     }
-
-    // Convert travel to quote currency to deduct from net profit
-    const travelCostInQuoteCurrency = currency === 'RMB' ? travelCostRmb : travelCostUsd;
-    const netAfter = Math.max(0, rawNet - travelCostInQuoteCurrency);
+    const netAfter = Math.max(0, rawNet - expenseInQuoteCurrency);
 
     let netProfitAfterUsd = netAfter;
     let netProfitAfterRmb = netAfter * rate;
@@ -306,24 +353,40 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
       clientFee: fee,
       estimatedCost: cost,
       quoteCurrency: currency,
-      estimatedProfitUsd: baseProfitUsd,
-      estimatedProfitRmb: baseProfitRmb,
-      totalTravelCostUsd: Number(travelCostUsd.toFixed(2)),
-      totalTravelCostRmb: Number(travelCostRmb.toFixed(2)),
+      estimatedProfitUsd: Number(baseProfitUsd.toFixed(2)),
+      estimatedProfitRmb: Number(baseProfitRmb.toFixed(2)),
+      totalTravelCostUsd: Number(totalExpUsd.toFixed(2)),
+      totalTravelCostRmb: Number(totalExpRmb.toFixed(2)),
       netProfitAfterExpensesUsd: Number(netProfitAfterUsd.toFixed(2)),
       netProfitAfterExpensesRmb: Number(netProfitAfterRmb.toFixed(2)),
+      serviceExpenses: expensesList,
+      travelExpenses: {
+        transportCost: Number(totalExpRmb.toFixed(2)),
+        hotelCost: 0,
+        foodCost: 0,
+        otherCost: 0,
+        currency: 'RMB',
+        notes: expensesList.map((e) => e.title).filter(Boolean).join(', '),
+      },
     }));
   };
 
-  const handleTravelExpenseChange = (
-    field: 'transportCost' | 'hotelCost' | 'foodCost' | 'otherCost' | 'currency' | 'notes',
-    value: any
-  ) => {
-    const updated = {
-      ...travelExpenses,
-      [field]: value,
+  const handleAddExpense = (preset?: Partial<InquiryExpense>) => {
+    const newExp: InquiryExpense = {
+      id: `srv_exp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      title: preset?.title || '',
+      amount: preset?.amount || 0,
+      currency: preset?.currency || 'RMB',
+      amountRmb: 0,
+      amountUsd: 0,
+      date: preset?.date || new Date().toISOString().split('T')[0],
+      supplierOrPayee: preset?.supplierOrPayee || '',
+      paymentMethod: preset?.paymentMethod || 'WeChat Pay',
+      hasFapiao: preset?.hasFapiao ?? true,
+      notes: preset?.notes || '',
     };
-    setTravelExpenses(updated);
+    const updated = [...serviceExpenses, newExp];
+    setServiceExpenses(updated);
     updateFinancials(
       Number(formData.clientFee) || 0,
       Number(formData.estimatedCost) || 0,
@@ -332,23 +395,21 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
     );
   };
 
-  const applyTravelPreset = (preset: {
-    transport: number;
-    hotel: number;
-    food: number;
-    other: number;
-    label: string;
-  }) => {
-    const updated = {
-      ...travelExpenses,
-      transportCost: preset.transport,
-      hotelCost: preset.hotel,
-      foodCost: preset.food,
-      otherCost: preset.other,
-      currency: 'RMB' as CurrencyUnit,
-      notes: preset.label ? `${preset.label}. ${travelExpenses.notes || ''}`.trim() : travelExpenses.notes,
-    };
-    setTravelExpenses(updated);
+  const handleUpdateExpense = (index: number, patch: Partial<InquiryExpense>) => {
+    const updated = [...serviceExpenses];
+    updated[index] = { ...updated[index], ...patch };
+    setServiceExpenses(updated);
+    updateFinancials(
+      Number(formData.clientFee) || 0,
+      Number(formData.estimatedCost) || 0,
+      formData.quoteCurrency || 'USD',
+      updated
+    );
+  };
+
+  const handleRemoveExpense = (index: number) => {
+    const updated = serviceExpenses.filter((_, i) => i !== index);
+    setServiceExpenses(updated);
     updateFinancials(
       Number(formData.clientFee) || 0,
       Number(formData.estimatedCost) || 0,
@@ -375,25 +436,12 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
     e.preventDefault();
     if (!formData.clientName || !formData.title) return;
 
-    const travelSum =
-      (Number(travelExpenses.transportCost) || 0) +
-      (Number(travelExpenses.hotelCost) || 0) +
-      (Number(travelExpenses.foodCost) || 0) +
-      (Number(travelExpenses.otherCost) || 0);
-
-    let travelCostRmb = travelSum;
-    let travelCostUsd = travelSum / rate;
-    if (travelExpenses.currency === 'USD') {
-      travelCostUsd = travelSum;
-      travelCostRmb = travelSum * rate;
-    }
-
     const fee = Number(formData.clientFee) || 0;
     const cost = Number(formData.estimatedCost) || 0;
     const rawNet = Math.max(0, fee - cost);
     const curr = formData.quoteCurrency || 'USD';
-    const travelInQuote = curr === 'USD' ? travelCostUsd : travelCostRmb;
-    const netAfter = Math.max(0, rawNet - travelInQuote);
+    const expenseInQuote = curr === 'USD' ? totalExpenses.usd : totalExpenses.rmb;
+    const netAfter = Math.max(0, rawNet - expenseInQuote);
 
     const payload: ServiceRequest = {
       id: formData.id || `srv_${Date.now()}`,
@@ -420,9 +468,17 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
       partnerCommission: Number(formData.partnerCommission) || 0,
       targetDate: formData.targetDate || '',
       notes: formData.notes || '',
-      travelExpenses: travelSum > 0 ? travelExpenses : undefined,
-      totalTravelCostUsd: travelSum > 0 ? Number(travelCostUsd.toFixed(2)) : 0,
-      totalTravelCostRmb: travelSum > 0 ? Number(travelCostRmb.toFixed(2)) : 0,
+      serviceExpenses: serviceExpenses,
+      travelExpenses: {
+        transportCost: Number(totalExpenses.rmb.toFixed(2)),
+        hotelCost: 0,
+        foodCost: 0,
+        otherCost: 0,
+        currency: 'RMB',
+        notes: serviceExpenses.map((e) => e.title).filter(Boolean).join(', '),
+      },
+      totalTravelCostUsd: Number(totalExpenses.usd.toFixed(2)),
+      totalTravelCostRmb: Number(totalExpenses.rmb.toFixed(2)),
       netProfitAfterExpensesUsd: Number((curr === 'USD' ? netAfter : netAfter / rate).toFixed(2)),
       netProfitAfterExpensesRmb: Number((curr === 'RMB' ? netAfter : netAfter * rate).toFixed(2)),
       createdAt: formData.createdAt || new Date().toISOString(),
@@ -431,31 +487,36 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
 
     onSave(payload);
 
-    // Auto-log to China Business Expenses if checked and has travel costs
-    if (alsoLogToExpenses && travelSum > 0 && onSaveExpense) {
-      const expTitle = `Relocation & Factory Audit: ${payload.title} (${payload.clientName})`;
-      const expenseItem: ExpenseItem = {
-        id: `exp_${Date.now()}`,
-        expenseNumber: `EXP-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`,
-        date: payload.date || new Date().toISOString().split('T')[0],
-        category: 'Transport',
-        subType: 'Factory Relocation Travel',
-        title: expTitle,
-        amount: travelSum,
-        currency: travelExpenses.currency,
-        amountRmb: Number(travelCostRmb.toFixed(2)),
-        amountUsd: Number(travelCostUsd.toFixed(2)),
-        city: payload.cityLocation || 'Guangzhou',
-        destinationRoute: `Travel across China for ${payload.serviceNumber}`,
-        factoryOrPartner: payload.assignedPartner || payload.title,
-        hasFapiao: true,
-        paymentMethod: 'WeChat Pay',
-        linkedServiceId: payload.id,
-        notes: `Auto-recorded from Service Request ${payload.serviceNumber}. Transport: ¥${travelExpenses.transportCost}, Hotel: ¥${travelExpenses.hotelCost}, Food: ¥${travelExpenses.foodCost}, Other: ¥${travelExpenses.otherCost}. ${travelExpenses.notes || ''}`.trim(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      onSaveExpense(expenseItem);
+    // Auto-log to China Business Expenses if checked and has expenses
+    if (alsoLogToExpenses && serviceExpenses.length > 0 && onSaveExpense) {
+      serviceExpenses.forEach((exp, idx) => {
+        const amt = Number(exp.amount) || 0;
+        if (amt <= 0) return;
+        const amtUsd = exp.currency === 'USD' ? amt : amt / rate;
+        const amtRmb = exp.currency === 'RMB' ? amt : amt * rate;
+        const expenseItem: ExpenseItem = {
+          id: `exp_${Date.now()}_${idx}`,
+          expenseNumber: `EXP-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}${idx}`,
+          date: exp.date || payload.date || new Date().toISOString().split('T')[0],
+          category: 'Transport',
+          subType: 'Service Out-of-Pocket Cost',
+          title: `${exp.title || 'Service Cost'} (${payload.serviceNumber}: ${payload.clientName || payload.title})`,
+          amount: amt,
+          currency: exp.currency,
+          amountRmb: Number(amtRmb.toFixed(2)),
+          amountUsd: Number(amtUsd.toFixed(2)),
+          city: payload.cityLocation || 'Guangzhou',
+          destinationRoute: `Service out-of-pocket for ${payload.serviceNumber}`,
+          factoryOrPartner: exp.supplierOrPayee || payload.assignedPartner || payload.title,
+          hasFapiao: exp.hasFapiao ?? true,
+          paymentMethod: exp.paymentMethod || 'WeChat Pay',
+          linkedServiceId: payload.id,
+          notes: `Auto-recorded from Service Request ${payload.serviceNumber}. ${exp.notes || ''}`.trim(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        onSaveExpense(expenseItem);
+      });
     }
   };
 
@@ -860,278 +921,338 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
             </div>
           </div>
 
-          {/* On-Ground Travel & Factory Relocation Expenses (China) */}
-          <div className="p-3.5 sm:p-4 bg-amber-50/50 rounded-xl border border-amber-200 space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-amber-500/10 text-amber-700 rounded-lg">
-                  <Receipt className="w-4 h-4" />
-                </div>
-                <div>
-                  <span className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
-                    Travel & Factory Relocation Expenses (China)
+          {/* Section 8: Service Out-of-Pocket Expenses & Travel Costs */}
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 sm:p-4 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-[11px] uppercase font-bold tracking-wider text-slate-700 flex items-center gap-1.5">
+                  <Receipt className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Service Out-of-Pocket Expenses & Direct Costs</span>
+                </h3>
+                {serviceExpenses && serviceExpenses.length > 0 ? (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1 font-mono">
+                    <Coins className="w-3 h-3 text-emerald-600" />
+                    {serviceExpenses.length} {serviceExpenses.length === 1 ? 'Cost' : 'Costs'} • {formatCurrency(totalExpenses.usd, 'USD')} (¥{formatCurrency(totalExpenses.rmb, 'RMB')})
                   </span>
-                  <p className="text-[11px] text-amber-800/80">
-                    Calculate transport, hotel, food & relocation costs across China for this service
-                  </p>
-                </div>
+                ) : (
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    (Travel, Gaotie train, hotel nights, Didi, per diem meals, official fees)
+                  </span>
+                )}
               </div>
 
-              {/* Currency Selector */}
-              <div className="flex items-center bg-white p-0.5 rounded-lg border border-amber-200 shrink-0 self-start sm:self-auto">
-                <span className="text-[10px] font-bold text-amber-800 px-2">Expense Currency:</span>
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <button
                   type="button"
-                  onClick={() => handleTravelExpenseChange('currency', 'RMB')}
-                  className={`px-2 py-0.5 rounded text-[11px] font-bold transition ${
-                    travelExpenses.currency === 'RMB'
-                      ? 'bg-amber-600 text-white shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                  id="service-add-custom-expense-btn"
+                  onClick={() => handleAddExpense()}
+                  className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 bg-white hover:bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-md transition flex items-center gap-1.5 shadow-2xs shrink-0 cursor-pointer"
                 >
-                  ¥ RMB
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleTravelExpenseChange('currency', 'USD')}
-                  className={`px-2 py-0.5 rounded text-[11px] font-bold transition ${
-                    travelExpenses.currency === 'USD'
-                      ? 'bg-amber-600 text-white shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  $ USD
+                  <Plus className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>+ Add Expense</span>
                 </button>
               </div>
             </div>
 
             {/* Quick Presets */}
-            <div className="flex items-center gap-1.5 flex-wrap pt-1">
-              <span className="text-[10px] uppercase font-bold text-amber-900 tracking-wider">
+            <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider shrink-0">
                 Quick Presets:
               </span>
               <button
                 type="button"
-                onClick={() => applyTravelPreset({ transport: 0, hotel: 0, food: 0, other: 0, label: '' })}
-                className="px-2 py-0.5 rounded text-[11px] font-medium bg-white border border-amber-200 hover:bg-amber-100/50 text-slate-700 transition"
+                onClick={() =>
+                  handleAddExpense({
+                    title: 'High-Speed Rail Gaotie Ticket',
+                    amount: 260,
+                    currency: 'RMB',
+                    supplierOrPayee: 'China Railway (12306)',
+                    paymentMethod: 'Alipay',
+                    hasFapiao: true,
+                  })
+                }
+                className="px-2.5 py-1 rounded text-[11px] font-medium bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 transition shadow-2xs cursor-pointer"
               >
-                No Travel (¥0)
+                + Gaotie Train (¥260)
               </button>
               <button
                 type="button"
                 onClick={() =>
-                  applyTravelPreset({
-                    transport: 150,
-                    hotel: 0,
-                    food: 100,
-                    other: 0,
-                    label: '1-Day Local Factory Audit (Didi + Lunch)',
+                  handleAddExpense({
+                    title: 'Didi Taxi / City Ride',
+                    amount: 80,
+                    currency: 'RMB',
+                    supplierOrPayee: 'Didi Chuxing (滴滴出行)',
+                    paymentMethod: 'WeChat Pay',
+                    hasFapiao: true,
                   })
                 }
-                className="px-2 py-0.5 rounded text-[11px] font-medium bg-white border border-amber-200 hover:bg-amber-100/50 text-slate-700 transition"
+                className="px-2.5 py-1 rounded text-[11px] font-medium bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 transition shadow-2xs cursor-pointer"
               >
-                1-Day Audit (¥250)
+                + Didi Taxi (¥80)
               </button>
               <button
                 type="button"
                 onClick={() =>
-                  applyTravelPreset({
-                    transport: 400,
-                    hotel: 350,
-                    food: 150,
-                    other: 0,
-                    label: '2-Day Intercity Audit (Gaotie + Hotel + Meals)',
+                  handleAddExpense({
+                    title: 'Hotel & Lodging Night',
+                    amount: 350,
+                    currency: 'RMB',
+                    supplierOrPayee: 'Hotel',
+                    paymentMethod: 'WeChat Pay',
+                    hasFapiao: true,
                   })
                 }
-                className="px-2 py-0.5 rounded text-[11px] font-medium bg-white border border-amber-200 hover:bg-amber-100/50 text-slate-700 transition"
+                className="px-2.5 py-1 rounded text-[11px] font-medium bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 transition shadow-2xs cursor-pointer"
               >
-                2-Day Stay (¥900)
+                + Hotel Night (¥350)
               </button>
               <button
                 type="button"
                 onClick={() =>
-                  applyTravelPreset({
-                    transport: 1100,
-                    hotel: 700,
-                    food: 350,
-                    other: 100,
-                    label: '3-Day Multi-City Trip (High-Speed Train, 2 Nights Hotel, Per Diem)',
+                  handleAddExpense({
+                    title: 'Daily Per Diem Meals & Food',
+                    amount: 120,
+                    currency: 'RMB',
+                    supplierOrPayee: 'Restaurant / Per Diem',
+                    paymentMethod: 'WeChat Pay',
+                    hasFapiao: false,
                   })
                 }
-                className="px-2 py-0.5 rounded text-[11px] font-medium bg-white border border-amber-200 hover:bg-amber-100/50 text-slate-700 transition"
+                className="px-2.5 py-1 rounded text-[11px] font-medium bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 transition shadow-2xs cursor-pointer"
               >
-                3-Day Multi-City (¥2,250)
+                + Meals / Food (¥120)
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  handleAddExpense({
+                    title: 'Official / Notary / Government Fee',
+                    amount: 500,
+                    currency: 'RMB',
+                    supplierOrPayee: 'Administration Bureau / Notary',
+                    paymentMethod: 'Bank Transfer',
+                    hasFapiao: true,
+                  })
+                }
+                className="px-2.5 py-1 rounded text-[11px] font-medium bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 transition shadow-2xs cursor-pointer"
+              >
+                + Official Fee (¥500)
               </button>
             </div>
 
-            {/* Expense Inputs Grid: Transport, Hotel, Food, Other */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-              {/* Transport */}
-              <div className="bg-white p-2.5 rounded-lg border border-amber-200">
-                <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center gap-1">
-                  <Train className="w-3.5 h-3.5 text-blue-600" />
-                  Transport / Gaotie / Didi
-                </label>
-                <div className="relative">
-                  <span className="absolute left-2.5 top-1.5 text-xs font-bold text-slate-400">
-                    {travelExpenses.currency === 'RMB' ? '¥' : '$'}
-                  </span>
-                  <input
-                    type="number"
-                    step="any"
-                    min="0"
-                    placeholder="0"
-                    value={travelExpenses.transportCost || ''}
-                    onChange={(e) =>
-                      handleTravelExpenseChange('transportCost', parseFloat(e.target.value) || 0)
-                    }
-                    className="w-full pl-6 pr-2 py-1.5 text-xs font-mono font-bold border border-slate-300 rounded focus:outline-none focus:border-amber-500 bg-white"
-                  />
-                </div>
-                <span className="text-[10px] text-slate-500 mt-1 block">
-                  High-speed train, flights, taxis
-                </span>
+            {/* Expenses List */}
+            {serviceExpenses && serviceExpenses.length > 0 ? (
+              <div className="space-y-2.5">
+                {serviceExpenses.map((exp, idx) => (
+                  <div
+                    key={exp.id || idx}
+                    className="p-3 bg-white rounded-lg border border-slate-200 shadow-2xs space-y-2.5"
+                  >
+                    {/* Top Row: Description & Amount */}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold flex items-center justify-center shrink-0">
+                        {idx + 1}
+                      </span>
+
+                      {/* Custom Title Input */}
+                      <input
+                        type="text"
+                        placeholder="What is this expense for? (e.g. Gaotie to Dongguan, Hotel night, Didi ride...)"
+                        value={exp.title || ''}
+                        onChange={(e) => handleUpdateExpense(idx, { title: e.target.value })}
+                        className="flex-1 min-w-0 px-2.5 py-1.5 text-xs border border-slate-300 rounded focus:outline-none focus:border-emerald-500 font-medium"
+                      />
+
+                      {/* Currency & Amount Controls */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="flex items-center bg-slate-100 p-0.5 rounded border border-slate-200">
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateExpense(idx, { currency: 'RMB' })}
+                            className={`px-2 py-1 rounded text-[10px] font-bold transition cursor-pointer ${
+                              exp.currency === 'RMB'
+                                ? 'bg-white text-emerald-700 shadow-2xs font-extrabold'
+                                : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                          >
+                            ¥ RMB
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateExpense(idx, { currency: 'USD' })}
+                            className={`px-2 py-1 rounded text-[10px] font-bold transition cursor-pointer ${
+                              exp.currency === 'USD'
+                                ? 'bg-white text-emerald-700 shadow-2xs font-extrabold'
+                                : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                          >
+                            $ USD
+                          </button>
+                        </div>
+
+                        <div className="relative w-28 sm:w-32">
+                          <span className="absolute left-2.5 top-1.5 text-xs font-bold text-slate-400">
+                            {exp.currency === 'USD' ? '$' : '¥'}
+                          </span>
+                          <input
+                            type="number"
+                            step="any"
+                            min="0"
+                            placeholder="0.00"
+                            value={exp.amount || ''}
+                            onChange={(e) =>
+                              handleUpdateExpense(idx, { amount: parseFloat(e.target.value) || 0 })
+                            }
+                            className="w-full pl-6 pr-2 py-1 text-xs font-mono font-bold border border-slate-300 rounded focus:outline-none focus:border-emerald-500 text-right bg-white"
+                          />
+                        </div>
+
+                        {/* Live Conversion indicator */}
+                        <div className="hidden sm:block text-[11px] font-mono text-slate-400 min-w-[70px] text-right">
+                          {exp.currency === 'RMB'
+                            ? `≈ $${((Number(exp.amount) || 0) / rate).toFixed(2)}`
+                            : `≈ ¥${((Number(exp.amount) || 0) * rate).toFixed(2)}`}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveExpense(idx)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
+                          title="Remove this expense"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Sub-row: Payee, Date, Method, Fapiao */}
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 text-xs pt-1 border-t border-slate-100">
+                      <div className="sm:col-span-4 min-w-0">
+                        <input
+                          type="text"
+                          placeholder="Payee / Supplier (e.g. 12306, Hotel, Didi)"
+                          value={exp.supplierOrPayee || ''}
+                          onChange={(e) => handleUpdateExpense(idx, { supplierOrPayee: e.target.value })}
+                          className="w-full px-2 py-1 text-[11px] border border-slate-200 rounded bg-slate-50/50 focus:bg-white focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-3 min-w-0">
+                        <input
+                          type="date"
+                          value={exp.date || ''}
+                          onChange={(e) => handleUpdateExpense(idx, { date: e.target.value })}
+                          className="w-full px-2 py-1 text-[11px] border border-slate-200 rounded bg-slate-50/50 focus:bg-white focus:outline-none focus:border-emerald-500 font-mono"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-3 min-w-0">
+                        <select
+                          value={exp.paymentMethod || 'WeChat Pay'}
+                          onChange={(e) => handleUpdateExpense(idx, { paymentMethod: e.target.value as any })}
+                          className="w-full px-2 py-1 text-[11px] border border-slate-200 rounded bg-slate-50/50 focus:bg-white focus:outline-none focus:border-emerald-500 text-slate-700"
+                        >
+                          <option value="WeChat Pay">WeChat Pay (微信)</option>
+                          <option value="Alipay">Alipay (支付宝)</option>
+                          <option value="Bank Transfer">Bank Transfer (对公/个人转账)</option>
+                          <option value="Cash">Cash (现金)</option>
+                          <option value="Credit Card">Credit Card (信用卡)</option>
+                        </select>
+                      </div>
+
+                      <div className="sm:col-span-2 flex items-center justify-start sm:justify-end">
+                        <label className="flex items-center gap-1.5 text-[11px] text-slate-600 font-medium cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={exp.hasFapiao ?? true}
+                            onChange={(e) => handleUpdateExpense(idx, { hasFapiao: e.target.checked })}
+                            className="w-3.5 h-3.5 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
+                          />
+                          <span>发票 Fapiao</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-
-              {/* Hotel */}
-              <div className="bg-white p-2.5 rounded-lg border border-amber-200">
-                <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center gap-1">
-                  <Hotel className="w-3.5 h-3.5 text-indigo-600" />
-                  Hotel & Lodging
-                </label>
-                <div className="relative">
-                  <span className="absolute left-2.5 top-1.5 text-xs font-bold text-slate-400">
-                    {travelExpenses.currency === 'RMB' ? '¥' : '$'}
-                  </span>
-                  <input
-                    type="number"
-                    step="any"
-                    min="0"
-                    placeholder="0"
-                    value={travelExpenses.hotelCost || ''}
-                    onChange={(e) =>
-                      handleTravelExpenseChange('hotelCost', parseFloat(e.target.value) || 0)
-                    }
-                    className="w-full pl-6 pr-2 py-1.5 text-xs font-mono font-bold border border-slate-300 rounded focus:outline-none focus:border-amber-500 bg-white"
-                  />
+            ) : (
+              <div className="p-4 bg-white rounded-lg border border-dashed border-slate-300 text-center space-y-1.5">
+                <Receipt className="w-6 h-6 text-slate-300 mx-auto" />
+                <div className="text-xs font-semibold text-slate-600">
+                  No service-specific expenses recorded yet
                 </div>
-                <span className="text-[10px] text-slate-500 mt-1 block">
-                  Hotel nights near factory zone
-                </span>
-              </div>
-
-              {/* Food */}
-              <div className="bg-white p-2.5 rounded-lg border border-amber-200">
-                <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center gap-1">
-                  <Utensils className="w-3.5 h-3.5 text-amber-600" />
-                  Food & Daily Meals
-                </label>
-                <div className="relative">
-                  <span className="absolute left-2.5 top-1.5 text-xs font-bold text-slate-400">
-                    {travelExpenses.currency === 'RMB' ? '¥' : '$'}
-                  </span>
-                  <input
-                    type="number"
-                    step="any"
-                    min="0"
-                    placeholder="0"
-                    value={travelExpenses.foodCost || ''}
-                    onChange={(e) =>
-                      handleTravelExpenseChange('foodCost', parseFloat(e.target.value) || 0)
-                    }
-                    className="w-full pl-6 pr-2 py-1.5 text-xs font-mono font-bold border border-slate-300 rounded focus:outline-none focus:border-amber-500 bg-white"
-                  />
-                </div>
-                <span className="text-[10px] text-slate-500 mt-1 block">
-                  Per diem, dinners with suppliers
-                </span>
-              </div>
-
-              {/* Other */}
-              <div className="bg-white p-2.5 rounded-lg border border-amber-200">
-                <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center gap-1">
-                  <Car className="w-3.5 h-3.5 text-emerald-600" />
-                  Other Relocation / Misc
-                </label>
-                <div className="relative">
-                  <span className="absolute left-2.5 top-1.5 text-xs font-bold text-slate-400">
-                    {travelExpenses.currency === 'RMB' ? '¥' : '$'}
-                  </span>
-                  <input
-                    type="number"
-                    step="any"
-                    min="0"
-                    placeholder="0"
-                    value={travelExpenses.otherCost || ''}
-                    onChange={(e) =>
-                      handleTravelExpenseChange('otherCost', parseFloat(e.target.value) || 0)
-                    }
-                    className="w-full pl-6 pr-2 py-1.5 text-xs font-mono font-bold border border-slate-300 rounded focus:outline-none focus:border-amber-500 bg-white"
-                  />
-                </div>
-                <span className="text-[10px] text-slate-500 mt-1 block">
-                  Tolls, sample baggage, driver hire
-                </span>
-              </div>
-            </div>
-
-            {/* Travel Notes & Auto-log checkbox */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-              <div className="sm:col-span-2">
-                <input
-                  type="text"
-                  placeholder="Relocation notes, route details (e.g. Shenzhen North -> Dongguan Tangxia 2 days)"
-                  value={travelExpenses.notes || ''}
-                  onChange={(e) => handleTravelExpenseChange('notes', e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded bg-white focus:outline-none focus:border-amber-500 font-medium"
-                />
-              </div>
-
-              <div className="flex items-center gap-1.5 px-2 bg-white rounded border border-amber-200">
-                <input
-                  type="checkbox"
-                  id="also-log-to-expenses-chk"
-                  checked={alsoLogToExpenses}
-                  onChange={(e) => setAlsoLogToExpenses(e.target.checked)}
-                  className="w-3.5 h-3.5 text-amber-600 rounded border-slate-300 focus:ring-amber-500"
-                />
-                <label
-                  htmlFor="also-log-to-expenses-chk"
-                  className="text-[11px] font-semibold text-slate-700 cursor-pointer select-none truncate"
-                  title="Also auto-log into China Business Expenses section upon saving"
-                >
-                  Sync to China Expenses section
-                </label>
-              </div>
-            </div>
-
-            {/* Live Financial Impact Display */}
-            {((Number(travelExpenses.transportCost) || 0) +
-              (Number(travelExpenses.hotelCost) || 0) +
-              (Number(travelExpenses.foodCost) || 0) +
-              (Number(travelExpenses.otherCost) || 0)) > 0 && (
-              <div className="p-2.5 bg-amber-100/70 rounded-lg border border-amber-300 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-amber-950">Total Travel Expenses:</span>
-                  <span className="font-mono font-extrabold text-amber-900">
-                    ¥{formData.totalTravelCostRmb?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                  <span className="text-amber-800 font-mono text-[11px]">
-                    (${formData.totalTravelCostUsd?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-emerald-900">Adjusted Net Profit:</span>
-                  <span className="font-mono font-extrabold text-emerald-800">
-                    +${(formData.netProfitAfterExpensesUsd ?? formData.estimatedProfitUsd ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                  <span className="text-emerald-700 font-mono text-[11px]">
-                    (+¥{(formData.netProfitAfterExpensesRmb ?? formData.estimatedProfitRmb ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
-                  </span>
-                </div>
+                <p className="text-[11px] text-slate-400 max-w-md mx-auto">
+                  Track Gaotie tickets, hotel nights, Didi rides, per diem meals, or official fees directly inside this service request.
+                </p>
               </div>
             )}
+
+            {/* Auto-log to China Business Expenses checkbox */}
+            <div className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200 text-xs">
+              <label htmlFor="service-sync-expenses-chk" className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  id="service-sync-expenses-chk"
+                  checked={alsoLogToExpenses}
+                  onChange={(e) => setAlsoLogToExpenses(e.target.checked)}
+                  className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                />
+                <span className="font-semibold text-slate-700">Auto-sync recorded expenses to China Business Expenses table</span>
+              </label>
+              <span className="text-[11px] text-slate-400 hidden sm:inline">Keeps company P&L and expense books in sync</span>
+            </div>
+
+            {/* Consolidated Net Profit Summary Card */}
+            <div className="bg-slate-900 text-white rounded-lg p-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-center shadow-xs">
+              <div>
+                <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                  Client Billed Fee
+                </div>
+                <div className="text-sm font-bold font-mono text-white mt-0.5">
+                  {formData.quoteCurrency === 'USD' ? '$' : '¥'}{Number(formData.clientFee || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <div className="text-[10px] font-mono text-slate-400">
+                  ({formData.quoteCurrency === 'USD' ? `¥${(Number(formData.clientFee || 0) * rate).toFixed(2)}` : `$${(Number(formData.clientFee || 0) / rate).toFixed(2)}`})
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[10px] text-amber-400 uppercase font-bold tracking-wider">
+                  Service Partner Cost
+                </div>
+                <div className="text-sm font-bold font-mono text-amber-400 mt-0.5">
+                  -{formData.quoteCurrency === 'USD' ? '$' : '¥'}{Number(formData.estimatedCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <div className="text-[10px] font-mono text-amber-400/80">
+                  (-{formData.quoteCurrency === 'USD' ? `¥${(Number(formData.estimatedCost || 0) * rate).toFixed(2)}` : `$${(Number(formData.estimatedCost || 0) / rate).toFixed(2)}`})
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[10px] text-rose-300 uppercase font-bold tracking-wider">
+                  Service Expenses ({serviceExpenses.length})
+                </div>
+                <div className="text-sm font-bold font-mono text-rose-300 mt-0.5">
+                  -{formatCurrency(totalExpenses.usd, 'USD')}
+                </div>
+                <div className="text-[10px] font-mono text-rose-300/80">
+                  (-¥{formatCurrency(totalExpenses.rmb, 'RMB')})
+                </div>
+              </div>
+
+              <div className="bg-slate-800/90 rounded-md p-1.5 border border-slate-700">
+                <div className="text-[10px] text-emerald-400 uppercase font-bold tracking-wider">
+                  Adjusted Net Profit
+                </div>
+                <div className="text-base font-bold font-mono text-emerald-400 mt-0.5">
+                  +${Number(formData.netProfitAfterExpensesUsd ?? formData.estimatedProfitUsd ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <div className="text-[10px] font-mono text-emerald-400/80">
+                  (+¥{Number(formData.netProfitAfterExpensesRmb ?? formData.estimatedProfitRmb ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Status & Priority */}

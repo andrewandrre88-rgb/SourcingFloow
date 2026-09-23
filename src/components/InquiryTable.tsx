@@ -19,7 +19,7 @@ import {
   Target,
   Receipt,
 } from 'lucide-react';
-import { InquiryItem, OrderStatus, CurrencyViewMode } from '../types';
+import { InquiryItem, OrderStatus, CurrencyViewMode, Customer, ExchangeRates } from '../types';
 import {
   formatCurrency,
   formatUnitPrice,
@@ -31,10 +31,32 @@ import {
   calculateTotalInquiryExpenses,
 } from '../lib/currency';
 import { detectB2BPlatform } from '../lib/b2bPlatforms';
-import { getCountryFlag } from '../lib/countryFlags';
+import {
+  getCountryFlag,
+  cleanPhoneNumber,
+  getWhatsAppMessengerUrl,
+  getWhatsAppWebUrl,
+  openWhatsAppMessenger,
+} from '../lib/countryFlags';
+
+/**
+ * Official WhatsApp SVG Icon with standard dimensions & currentColor fill
+ */
+export const WhatsAppIcon: React.FC<{ className?: string }> = ({ className = 'w-3.5 h-3.5' }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    className={className}
+    aria-hidden="true"
+  >
+    <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2m.01 1.67c2.2 0 4.26.86 5.82 2.42a8.225 8.225 0 0 1 2.41 5.83c0 4.54-3.7 8.24-8.24 8.24-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.196 8.196 0 0 1-1.26-4.36c0-4.54 3.7-8.24 8.24-8.24m4.57 11.66c-.25-.13-1.47-.72-1.7-.81-.23-.08-.39-.13-.56.13-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.13-1.05-.39-2-1.23-.74-.66-1.24-1.47-1.38-1.72-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.44.13-.15.17-.25.25-.42.08-.17.04-.31-.02-.44-.06-.13-.56-1.35-.77-1.85-.2-.49-.41-.42-.56-.43h-.48c-.17 0-.44.06-.66.31-.23.25-.88.85-.88 2.08s.9 2.41 1.02 2.58c.13.17 1.76 2.68 4.26 3.76.59.26 1.06.41 1.42.53.6.19 1.14.16 1.57.1.48-.07 1.47-.6 1.68-1.18.21-.58.21-1.08.15-1.18-.06-.11-.23-.17-.48-.3z" />
+  </svg>
+);
 
 interface InquiryTableProps {
   inquiries: InquiryItem[];
+  customers?: Customer[];
+  exchangeRates?: ExchangeRates;
   usdToRmbRate: number;
   currencyView?: CurrencyViewMode;
   onView: (item: InquiryItem) => void;
@@ -61,6 +83,7 @@ const ALL_STATUSES: OrderStatus[] = [
 
 export const InquiryTable: React.FC<InquiryTableProps> = ({
   inquiries,
+  customers = [],
   usdToRmbRate,
   currencyView = 'USD',
   onView,
@@ -74,6 +97,79 @@ export const InquiryTable: React.FC<InquiryTableProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [sortField, setSortField] = useState<keyof InquiryItem>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  // Resolves WhatsApp contact and preformatted inquiry quote message
+  const getInquiryWhatsAppDetails = (item: InquiryItem) => {
+    let phone = '';
+
+    // 1. Check matching client in customer directory
+    if (customers && customers.length > 0) {
+      const match = customers.find(
+        (c) =>
+          c.name.toLowerCase() === item.customerName.toLowerCase() ||
+          (c.company && c.company.toLowerCase() === item.customerName.toLowerCase())
+      );
+      if (match?.whatsapp) {
+        phone = cleanPhoneNumber(match.whatsapp);
+      } else if (match?.contactPhone) {
+        phone = cleanPhoneNumber(match.contactPhone);
+      }
+    }
+
+    // 2. Fallback to inquiry customerContact
+    if (!phone && item.customerContact) {
+      const parts = item.customerContact.split(/[/,;]/);
+      for (const part of parts) {
+        const cleaned = cleanPhoneNumber(part);
+        if (cleaned && cleaned.length >= 6) {
+          phone = cleaned;
+          break;
+        }
+      }
+    }
+
+    const msg = `Hello ${item.customerName}, regarding your inquiry ${item.inquiryNumber} for ${item.product}:
+• Qty: ${Number(item.quantity).toLocaleString()} ${item.quantityUnit || 'pcs'}
+• Quoted Unit Price: $${Number(item.clientUnitPriceUsd || 0).toFixed(2)}
+• Total Quotation: $${Number(item.totalQuotationUsd || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+• Destination: ${item.country || 'Global'}
+• Status: ${item.orderStatus}
+
+Please let us know if you need any adjustments or would like to proceed with a sample!`;
+
+    const messengerUrl = phone ? getWhatsAppMessengerUrl(phone, msg) : '';
+    const webUrl = phone ? getWhatsAppWebUrl(phone, msg) : '';
+
+    return { phone, msg, messengerUrl, webUrl };
+  };
+
+  const handleOpenWhatsApp = (e: React.MouseEvent, item: InquiryItem) => {
+    const details = getInquiryWhatsAppDetails(item);
+    let phone = details.phone;
+    const msg = details.msg;
+
+    if (!phone) {
+      e.preventDefault();
+      const entered = window.prompt(
+        `Enter WhatsApp number (including country code, e.g. +1... or +86...) for ${item.customerName}:`,
+        ''
+      );
+      if (!entered) return;
+      phone = cleanPhoneNumber(entered);
+      if (!phone) return;
+    }
+
+    // Direct WhatsApp Messenger launcher
+    openWhatsAppMessenger(phone, msg);
+
+    // For desktop web browsers, also open WhatsApp Web tab in background/new window
+    if (typeof window !== 'undefined' && !/android|iphone|ipad|ipod/i.test(navigator.userAgent || '')) {
+      const webUrl = getWhatsAppWebUrl(phone, msg);
+      if (webUrl) {
+        window.open(webUrl, '_blank', 'noopener,noreferrer');
+      }
+    }
+  };
 
   // Filter inquiries
   const filtered = inquiries.filter((item) => {
@@ -291,6 +387,7 @@ export const InquiryTable: React.FC<InquiryTableProps> = ({
                 const expenseCount = item.inquiryExpenses?.length || 0;
                 const netProfitUsd = Number((profitUsd - helpersCommissionUsd - expensesUsd).toFixed(2));
                 const helperCount = item.helperCommissions?.length || 0;
+                const waDetails = getInquiryWhatsAppDetails(item);
 
                 return (
                   <tr
@@ -563,6 +660,24 @@ export const InquiryTable: React.FC<InquiryTableProps> = ({
                     {/* Actions */}
                     <td className="py-2.5 px-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end space-x-0.5">
+                        {/* Open in WhatsApp */}
+                        <a
+                          id={`inquiry-whatsapp-btn-${item.id}`}
+                          href={waDetails.webUrl || waDetails.messengerUrl || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => handleOpenWhatsApp(e, item)}
+                          title={
+                            waDetails.phone
+                              ? `Open in WhatsApp: ${item.customerName} (${waDetails.phone})`
+                              : `Open WhatsApp chat with ${item.customerName}`
+                          }
+                          className="p-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded transition cursor-pointer inline-flex items-center justify-center"
+                          aria-label={`Open WhatsApp for ${item.customerName}`}
+                        >
+                          <WhatsAppIcon className="w-3.5 h-3.5" />
+                        </a>
+
                         {/* View Full Info */}
                         <button
                           id={`inquiry-view-btn-${item.id}`}
@@ -648,6 +763,7 @@ export const InquiryTable: React.FC<InquiryTableProps> = ({
             const expenseCount = item.inquiryExpenses?.length || 0;
             const netProfitUsd = Number((profitUsd - helpersCommissionUsd - expensesUsd).toFixed(2));
             const helperCount = item.helperCommissions?.length || 0;
+            const waDetails = getInquiryWhatsAppDetails(item);
 
             return (
               <div
@@ -813,28 +929,41 @@ export const InquiryTable: React.FC<InquiryTableProps> = ({
 
                 {/* Mobile Action Buttons Bar */}
                 <div className="pt-2.5 border-t border-slate-100 flex flex-col gap-2">
-                  {/* Row 1: Primary View Details & Share Quote */}
+                  {/* Row 1: Primary View Details, WhatsApp & Share Quote */}
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       id={`mobile-inquiry-view-btn-${item.id}`}
                       onClick={() => onView(item)}
-                      className="flex-1 min-w-0 inline-flex items-center justify-center gap-2 px-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer"
+                      className="flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 px-2.5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer"
                       title="View full inquiry details and breakdown"
                     >
                       <Eye className="w-4 h-4 shrink-0 text-white stroke-[2.2]" />
-                      <span className="truncate">View Details</span>
+                      <span className="truncate">View</span>
                     </button>
+
+                    <a
+                      id={`mobile-inquiry-whatsapp-btn-${item.id}`}
+                      href={waDetails.webUrl || waDetails.messengerUrl || '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => handleOpenWhatsApp(e, item)}
+                      className="flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 px-2.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer"
+                      title={waDetails.phone ? `Open in WhatsApp (${waDetails.phone})` : 'Open in WhatsApp'}
+                    >
+                      <WhatsAppIcon className="w-4 h-4 shrink-0 text-white" />
+                      <span className="truncate">WhatsApp</span>
+                    </a>
 
                     <button
                       type="button"
                       id={`mobile-inquiry-share-btn-${item.id}`}
                       onClick={() => onQuickShare(item)}
-                      className="flex-1 min-w-0 inline-flex items-center justify-center gap-2 px-3 py-2.5 bg-emerald-50 hover:bg-emerald-100 active:scale-[0.98] text-emerald-800 border border-emerald-300 rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
+                      className="flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 px-2.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 active:scale-[0.98] text-emerald-800 border border-emerald-300 rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
                       title="Generate shareable quotation card"
                     >
                       <Share2 className="w-4 h-4 shrink-0 text-emerald-600 stroke-[2.2]" />
-                      <span className="truncate">Share Quote</span>
+                      <span className="truncate">Share</span>
                     </button>
                   </div>
 

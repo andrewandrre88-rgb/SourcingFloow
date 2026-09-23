@@ -229,6 +229,7 @@ export interface ServiceRequest {
     currency: CurrencyUnit;
     notes?: string;
   };
+  serviceExpenses?: InquiryExpense[]; // Itemized out-of-pocket expenses for this specific service
   totalTravelCostUsd?: number;
   totalTravelCostRmb?: number;
   netProfitAfterExpensesUsd?: number;
