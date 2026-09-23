@@ -267,13 +267,72 @@ export function cleanPhoneNumber(phone?: string): string {
   return phone.replace(/[^\d]/g, '');
 }
 
+/**
+ * Robustly extracts a valid client phone number from potentially mixed contact strings,
+ * such as "+1 (555) 234-8901 / aero@gmail.com", "wa.me/966501234567", "0501234567", etc.
+ * If the number starts with a local single 0 and country is given, auto-prepends the country dial code.
+ */
+export function extractClientPhone(contact?: string, country?: string): string {
+  if (!contact) return '';
+  const trimmed = contact.trim();
+  if (!trimmed) return '';
+
+  // 1. Direct wa.me link: wa.me/1234567890
+  const waMatch = trimmed.match(/wa\.me\/(\d+)/i);
+  if (waMatch && waMatch[1].length >= 7) {
+    return waMatch[1];
+  }
+
+  // 2. Split on common separators: /, ;, |, newline, comma
+  const parts = trimmed.split(/[/,;|\n]/);
+  let candidate = '';
+  for (const part of parts) {
+    const phoneMatch = part.match(/(?:\+|00)?[\d\s\-().]{7,}/);
+    if (phoneMatch) {
+      let digits = phoneMatch[0].replace(/[^\d]/g, '');
+      if (phoneMatch[0].trim().startsWith('00')) {
+        digits = digits.replace(/^00/, '');
+      }
+      if (digits.length >= 7 && digits.length <= 16) {
+        candidate = digits;
+        break;
+      }
+    }
+  }
+
+  // 3. Fallback to direct regex match or digit cleaning
+  if (!candidate) {
+    const directMatch = trimmed.match(/(?:\+|00)[\d\s\-().]{7,}/);
+    if (directMatch) {
+      candidate = directMatch[0].replace(/[^\d]/g, '').replace(/^00/, '');
+    } else {
+      const allDigits = trimmed.replace(/[^\d]/g, '');
+      if (allDigits.length >= 7 && allDigits.length <= 16) {
+        candidate = allDigits.replace(/^00/, '');
+      }
+    }
+  }
+
+  if (!candidate) return '';
+
+  // 4. If candidate starts with a single '0' and country is provided, prepend country dial code
+  if (candidate.startsWith('0') && candidate.length <= 11 && country) {
+    const dialCode = getCountryDialCode(country).replace(/[^\d]/g, '');
+    if (dialCode) {
+      candidate = dialCode + candidate.replace(/^0+/, '');
+    }
+  }
+
+  return candidate;
+}
+
 export const DEFAULT_WHATSAPP_MESSAGE = 'السلام عليكم ورحمة الله وبركاته';
 
 /**
  * Builds direct WhatsApp Web URL (opens web.whatsapp.com directly)
  */
 export function getWhatsAppWebUrl(phone: string, message: string = DEFAULT_WHATSAPP_MESSAGE): string {
-  const digits = cleanPhoneNumber(phone);
+  const digits = extractClientPhone(phone) || cleanPhoneNumber(phone);
   if (!digits) return '';
   const msgToSend = message !== undefined && message !== null ? message : DEFAULT_WHATSAPP_MESSAGE;
   const encoded = msgToSend ? encodeURIComponent(msgToSend) : '';
@@ -286,7 +345,7 @@ export function getWhatsAppWebUrl(phone: string, message: string = DEFAULT_WHATS
  * - On iOS, macOS, Windows, uses native 'whatsapp://send?phone=...' URI scheme for WhatsApp Messenger.
  */
 export function getWhatsAppMessengerUrl(phone: string, message: string = DEFAULT_WHATSAPP_MESSAGE): string {
-  const digits = cleanPhoneNumber(phone);
+  const digits = extractClientPhone(phone) || cleanPhoneNumber(phone);
   if (!digits) return '';
   const msgToSend = message !== undefined && message !== null ? message : DEFAULT_WHATSAPP_MESSAGE;
   const encoded = msgToSend ? encodeURIComponent(msgToSend) : '';
@@ -299,12 +358,27 @@ export function getWhatsAppMessengerUrl(phone: string, message: string = DEFAULT
 }
 
 /**
- * Programmatically opens WhatsApp Messenger directly, ensuring WhatsApp Business is bypassed.
+ * Programmatically opens WhatsApp Messenger directly in the native WhatsApp App,
+ * ensuring WhatsApp Business is bypassed and no browser tab is opened.
  */
 export function openWhatsAppMessenger(phone: string, message: string = DEFAULT_WHATSAPP_MESSAGE): void {
   const url = getWhatsAppMessengerUrl(phone, message);
   if (!url || typeof window === 'undefined') return;
-  window.location.href = url;
+
+  try {
+    const a = document.createElement('a');
+    a.href = url;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      if (document.body.contains(a)) {
+        document.body.removeChild(a);
+      }
+    }, 500);
+  } catch {
+    window.location.href = url;
+  }
 }
 
 /**

@@ -46,6 +46,8 @@ export interface InquiryItem {
   date: string; // YYYY-MM-DD
   customerName: string; // Client / Company Name
   customerContact?: string; // WhatsApp / Email
+  whatsapp?: string; // Client WhatsApp number
+  clientPhone?: string; // Client phone number
   wechatId?: string; // WeChat ID
   country: string; // Country of destination
   product: string; // Product name & brief spec

@@ -48,6 +48,7 @@ import { detectB2BPlatform } from '../lib/b2bPlatforms';
 import {
   getCountryFlag,
   cleanPhoneNumber,
+  extractClientPhone,
   getWhatsAppWebUrl,
   getWhatsAppMessengerUrl,
   openWhatsAppMessenger,
@@ -331,16 +332,16 @@ export const InquiryDetailModal: React.FC<InquiryDetailModalProps> = ({
                   </div>
 
                   {item.customerContact && (() => {
-                    const clean = cleanPhoneNumber(item.customerContact);
-                    const messengerUrl = clean
+                    const clientPhone = extractClientPhone(item.whatsapp || item.customerContact, item.country);
+                    const messengerUrl = clientPhone
                       ? getWhatsAppMessengerUrl(
-                          item.customerContact,
+                          clientPhone,
                           DEFAULT_WHATSAPP_MESSAGE
                         )
                       : null;
-                    const waWebUrl = clean
+                    const waWebUrl = clientPhone
                       ? getWhatsAppWebUrl(
-                          item.customerContact,
+                          clientPhone,
                           DEFAULT_WHATSAPP_MESSAGE
                         )
                       : null;
@@ -357,16 +358,17 @@ export const InquiryDetailModal: React.FC<InquiryDetailModalProps> = ({
                               <a
                                 href={messengerUrl}
                                 onClick={(e) => {
+                                  e.preventDefault();
                                   openWhatsAppMessenger(
-                                    item.customerContact || '',
+                                    clientPhone,
                                     DEFAULT_WHATSAPP_MESSAGE
                                   );
                                 }}
                                 className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-2xs cursor-pointer"
-                                title="Open in WhatsApp Messenger (com.whatsapp) - NOT WhatsApp Business"
+                                title={`Open client directly in WhatsApp App (+${clientPhone})`}
                               >
                                 <MessageCircle className="w-3 h-3" />
-                                <span>WhatsApp Messenger</span>
+                                <span>WhatsApp App</span>
                               </a>
                               {waWebUrl && (
                                 <a
