@@ -32,6 +32,7 @@ import {
   Receipt,
   CreditCard,
   Tag,
+  Palette,
 } from 'lucide-react';
 import { InquiryItem, OrderStatus } from '../types';
 import {
@@ -430,6 +431,112 @@ export const InquiryDetailModal: React.FC<InquiryDetailModalProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Multi-Products & Variants Breakdown (When client requested multiple items) */}
+          {item.products && item.products.length > 1 && (
+            <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-2xs">
+              <div className="px-4 py-2.5 bg-indigo-50/70 border-b border-indigo-100 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Package className="w-4 h-4 text-indigo-600" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-indigo-900">
+                    Products, Colors & Quantities Breakdown
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white text-indigo-700 border border-indigo-200 shadow-2xs">
+                    {item.products.length} Items Requested
+                  </span>
+                </div>
+                <div className="text-xs font-semibold text-slate-700">
+                  Total Order Volume: <strong className="text-indigo-700 font-bold font-mono">{Number(item.quantity).toLocaleString()} {item.quantityUnit || 'pcs'}</strong>
+                </div>
+              </div>
+
+              <div className="divide-y divide-slate-100 overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                    <tr>
+                      <th className="py-2.5 px-3.5">Item #</th>
+                      <th className="py-2.5 px-3.5">Product Name & Material</th>
+                      <th className="py-2.5 px-3.5">Color / Variant</th>
+                      <th className="py-2.5 px-3.5 text-right">Quantity</th>
+                      <th className="py-2.5 px-3.5 text-right">Target Price</th>
+                      <th className="py-2.5 px-3.5 text-center">Supplier Link</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {item.products.map((prod, idx) => (
+                      <tr key={prod.id || idx} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3 px-3.5 font-mono text-slate-400 font-bold">
+                          #{idx + 1}
+                        </td>
+                        <td className="py-3 px-3.5">
+                          <div className="flex items-center gap-2.5">
+                            {prod.imageUrl ? (
+                              <img
+                                src={prod.imageUrl}
+                                alt={prod.productName}
+                                className="w-9 h-9 rounded border border-slate-200 object-cover bg-white shrink-0 shadow-2xs"
+                                referrerPolicy="no-referrer"
+                              />
+                            ) : (
+                              <div className="w-9 h-9 rounded border border-slate-200 bg-slate-50 flex items-center justify-center shrink-0 text-slate-300">
+                                <Package className="w-4 h-4" />
+                              </div>
+                            )}
+                            <div>
+                              <div className="font-semibold text-slate-900 text-xs">{prod.productName}</div>
+                              {prod.material && (
+                                <div className="text-[10px] text-slate-500">{prod.material}</div>
+                              )}
+                              {prod.notes && (
+                                <div className="text-[10px] text-slate-400 italic mt-0.5">{prod.notes}</div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-3.5">
+                          {prod.colorVariant ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-900 border border-amber-200 shadow-2xs">
+                              <Palette className="w-3 h-3 text-amber-600" />
+                              {prod.colorVariant}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 italic text-[11px]">Standard</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-3.5 text-right font-mono font-bold text-slate-800 text-xs">
+                          {Number(prod.quantity || 1).toLocaleString()} {prod.quantityUnit || item.quantityUnit || 'pcs'}
+                        </td>
+                        <td className="py-3 px-3.5 text-right font-mono text-slate-700">
+                          {prod.targetPriceUsd ? (
+                            <span className="inline-flex items-center gap-0.5 text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded text-[11px]">
+                              ${Number(prod.targetPriceUsd).toFixed(2)}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">-</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-3.5 text-center">
+                          {prod.supplierUrl ? (
+                            <a
+                              href={prod.supplierUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[11px] text-indigo-600 hover:text-indigo-800 font-semibold hover:underline bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded transition"
+                            >
+                              <span>1688 / Link</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          ) : (
+                            <span className="text-slate-300 text-[10px]">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Product Specifications & Packaging Details (if any specs exist) */}
           {hasProductSpecs && (

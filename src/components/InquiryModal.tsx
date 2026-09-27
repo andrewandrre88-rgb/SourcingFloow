@@ -39,9 +39,14 @@ import {
   Train,
   Car,
   ShieldCheck,
+  Copy,
+  ArrowUp,
+  ArrowDown,
+  Palette,
 } from 'lucide-react';
 import {
   InquiryItem,
+  InquiryProductItem,
   OrderStatus,
   ExchangeRates,
   SupplierQuote,
@@ -133,6 +138,7 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
   const [marginMode, setMarginMode] = useState<MarginMode>('percent');
   const [marginInputRaw, setMarginInputRaw] = useState<string>('25');
   const [fixedMarginRmb, setFixedMarginRmb] = useState<number>(0);
+  const [productsList, setProductsList] = useState<InquiryProductItem[]>([]);
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [isCompressingImage, setIsCompressingImage] = useState(false);
@@ -144,10 +150,126 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
       try {
         const compressedBase64 = await compressImageFile(file, 320, 0.7);
         setFormData((prev) => ({ ...prev, imageUrl: compressedBase64 }));
+        if (productsList.length > 0) {
+          handleUpdateProduct(0, 'imageUrl', compressedBase64);
+        }
       } catch (err) {
         console.error('Failed to compress image:', err);
       } finally {
         setIsCompressingImage(false);
+      }
+    }
+  };
+
+  const handleAddProduct = () => {
+    const defaultQtyUnit = formData.quantityUnit || 'pcs';
+    const firstProd = productsList[0];
+    const newProd: InquiryProductItem = {
+      id: 'prod_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      productName: firstProd?.productName || '',
+      colorVariant: '',
+      quantity: 100,
+      quantityUnit: defaultQtyUnit,
+      material: firstProd?.material || '',
+      targetPriceUsd: firstProd?.targetPriceUsd,
+      targetPriceRmb: firstProd?.targetPriceRmb,
+      imageUrl: '',
+    };
+    const updated = [...productsList, newProd];
+    setProductsList(updated);
+    const sumQty = updated.reduce((acc, p) => acc + (Number(p.quantity) || 0), 0);
+    setFormData((prev) => ({
+      ...prev,
+      quantity: sumQty > 0 ? sumQty : prev.quantity,
+      products: updated,
+    }));
+  };
+
+  const handleDuplicateProduct = (index: number) => {
+    const source = productsList[index];
+    if (!source) return;
+    const cloned: InquiryProductItem = {
+      ...source,
+      id: 'prod_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      colorVariant: source.colorVariant ? `${source.colorVariant} (Variant)` : '',
+    };
+    const updated = [...productsList];
+    updated.splice(index + 1, 0, cloned);
+    setProductsList(updated);
+    const sumQty = updated.reduce((acc, p) => acc + (Number(p.quantity) || 0), 0);
+    setFormData((prev) => ({
+      ...prev,
+      quantity: sumQty > 0 ? sumQty : prev.quantity,
+      products: updated,
+    }));
+  };
+
+  const handleRemoveProduct = (index: number) => {
+    if (productsList.length <= 1) return;
+    const updated = productsList.filter((_, idx) => idx !== index);
+    setProductsList(updated);
+    const sumQty = updated.reduce((acc, p) => acc + (Number(p.quantity) || 0), 0);
+    setFormData((prev) => ({
+      ...prev,
+      product: updated[0]?.productName || prev.product,
+      colorVariant: updated[0]?.colorVariant || prev.colorVariant,
+      material: updated[0]?.material || prev.material,
+      imageUrl: updated[0]?.imageUrl || prev.imageUrl,
+      quantity: sumQty > 0 ? sumQty : prev.quantity,
+      products: updated,
+    }));
+  };
+
+  const handleMoveProduct = (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= productsList.length) return;
+    const updated = [...productsList];
+    const [moved] = updated.splice(index, 1);
+    updated.splice(targetIndex, 0, moved);
+    setProductsList(updated);
+    setFormData((prev) => ({
+      ...prev,
+      product: updated[0]?.productName || prev.product,
+      products: updated,
+    }));
+  };
+
+  const handleUpdateProduct = (index: number, field: keyof InquiryProductItem, value: any) => {
+    const updated = [...productsList];
+    const current = { ...updated[index], [field]: value };
+    updated[index] = current;
+    setProductsList(updated);
+
+    const sumQty = updated.reduce((acc, p) => acc + (Number(p.quantity) || 0), 0);
+    setFormData((prev) => {
+      const updates: Partial<InquiryItem> = {
+        products: updated,
+        quantity: sumQty > 0 ? sumQty : prev.quantity,
+      };
+      if (index === 0) {
+        if (field === 'productName') updates.product = value;
+        if (field === 'colorVariant') updates.colorVariant = value;
+        if (field === 'material') updates.material = value;
+        if (field === 'quantityUnit') updates.quantityUnit = value;
+        if (field === 'imageUrl') updates.imageUrl = value;
+        if (field === 'targetPriceUsd') updates.targetPriceUsd = value;
+        if (field === 'targetPriceRmb') updates.targetPriceRmb = value;
+      }
+      return { ...prev, ...updates };
+    });
+  };
+
+  const handleProductItemImageUpload = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        const compressedBase64 = await compressImageFile(file, 320, 0.7);
+        handleUpdateProduct(index, 'imageUrl', compressedBase64);
+        if (index === 0) {
+          setFormData((prev) => ({ ...prev, imageUrl: compressedBase64 }));
+        }
+      } catch (err) {
+        console.error('Failed to compress product image:', err);
       }
     }
   };
@@ -157,6 +279,26 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
     setQuoteInputsRaw({});
     setTargetPriceRaw(null);
     if (inquiryToEdit) {
+      // Initialize products list
+      const initialProducts: InquiryProductItem[] = inquiryToEdit.products && inquiryToEdit.products.length > 0
+        ? inquiryToEdit.products
+        : [
+            {
+              id: 'prod_' + Date.now(),
+              productName: inquiryToEdit.product || '',
+              colorVariant: inquiryToEdit.colorVariant || '',
+              quantity: inquiryToEdit.quantity || 500,
+              quantityUnit: inquiryToEdit.quantityUnit || 'pcs',
+              material: inquiryToEdit.material || '',
+              targetPriceUsd: inquiryToEdit.targetPriceUsd !== undefined ? Number(inquiryToEdit.targetPriceUsd) : undefined,
+              targetPriceRmb: inquiryToEdit.targetPriceRmb !== undefined ? Number(inquiryToEdit.targetPriceRmb) : undefined,
+              imageUrl: inquiryToEdit.imageUrl || '',
+              hsCode: inquiryToEdit.hsCode || '',
+              unitWeightG: inquiryToEdit.unitWeightG !== undefined ? Number(inquiryToEdit.unitWeightG) : undefined,
+            },
+          ];
+      setProductsList(initialProducts);
+
       // Migrate legacy single-quote to quotes array if missing
       const initialQuotes = inquiryToEdit.quotes?.length
         ? inquiryToEdit.quotes
@@ -229,6 +371,20 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
     } else {
       const nextNum = `INQ-${new Date().getFullYear()}-${String(existingCount + 1).padStart(3, '0')}`;
       const defaultQuoteId = 'quote_' + Date.now();
+      const initialProducts: InquiryProductItem[] = [
+        {
+          id: 'prod_' + Date.now(),
+          productName: '',
+          colorVariant: '',
+          quantity: 500,
+          quantityUnit: 'pcs',
+          material: '',
+          targetPriceUsd: undefined,
+          targetPriceRmb: undefined,
+          imageUrl: '',
+        },
+      ];
+      setProductsList(initialProducts);
       setFormData({
         id: `inq_${Date.now()}`,
         inquiryNumber: nextNum,
@@ -238,6 +394,7 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
         wechatId: '',
         country: 'United States',
         product: '',
+        products: initialProducts,
         imageUrl: '',
         material: '',
         colorVariant: '',
@@ -788,10 +945,14 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.customerName?.trim() || !formData.product?.trim()) {
-      alert('Please enter at least Customer Name and Product');
+    const effectiveProductName = productsList.find((p) => p.productName?.trim())?.productName?.trim() || formData.product?.trim() || '';
+    if (!formData.customerName?.trim() || !effectiveProductName) {
+      alert('Please enter at least Customer Name and Product Name');
       return;
     }
+
+    const calculatedTotalQty = productsList.reduce((sum, p) => sum + (Number(p.quantity) || 0), 0);
+    const finalQuantity = calculatedTotalQty > 0 ? calculatedTotalQty : (Number(formData.quantity) || 1);
 
     const finalItem: InquiryItem = {
       id: formData.id || `inq_${Date.now()}`,
@@ -803,12 +964,31 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
       customerContact: formData.customerContact?.trim() || '',
       wechatId: formData.wechatId?.trim() || undefined,
       country: formData.country?.trim() || 'Global',
-      product: formData.product.trim(),
-      imageUrl: formData.imageUrl?.trim() || '',
-      material: formData.material?.trim() || '',
-      colorVariant: formData.colorVariant?.trim() || '',
+      product: effectiveProductName,
+      products: productsList.map((p, idx) => ({
+        id: p.id || `prod_${Date.now()}_${idx}`,
+        productName: p.productName?.trim() || effectiveProductName,
+        colorVariant: p.colorVariant?.trim() || '',
+        quantity: Math.max(1, Number(p.quantity) || 1),
+        quantityUnit: p.quantityUnit || formData.quantityUnit || 'pcs',
+        material: p.material?.trim() || '',
+        targetPriceUsd: p.targetPriceUsd !== undefined && !isNaN(Number(p.targetPriceUsd)) ? Number(p.targetPriceUsd) : undefined,
+        targetPriceRmb: p.targetPriceRmb !== undefined && !isNaN(Number(p.targetPriceRmb)) ? Number(p.targetPriceRmb) : undefined,
+        price1688Rmb: p.price1688Rmb !== undefined && !isNaN(Number(p.price1688Rmb)) ? Number(p.price1688Rmb) : undefined,
+        clientUnitPriceUsd: p.clientUnitPriceUsd !== undefined && !isNaN(Number(p.clientUnitPriceUsd)) ? Number(p.clientUnitPriceUsd) : undefined,
+        imageUrl: p.imageUrl || '',
+        supplierUrl: p.supplierUrl?.trim() || '',
+        hsCode: p.hsCode?.trim() || '',
+        unitWeightG: p.unitWeightG !== undefined && !isNaN(Number(p.unitWeightG)) ? Number(p.unitWeightG) : undefined,
+        notes: p.notes?.trim() || '',
+      })),
+      imageUrl: (productsList.find((p) => p.imageUrl)?.imageUrl || formData.imageUrl?.trim()) || '',
+      material: productsList[0]?.material?.trim() || formData.material?.trim() || '',
+      colorVariant: productsList.length > 1
+        ? productsList.map((p) => p.colorVariant ? `${p.colorVariant} (${p.quantity} ${p.quantityUnit || 'pcs'})` : `${p.quantity} ${p.quantityUnit || 'pcs'}`).join(', ')
+        : (productsList[0]?.colorVariant?.trim() || formData.colorVariant?.trim() || ''),
       packagingType: formData.packagingType?.trim() || '',
-      hsCode: formData.hsCode?.trim() || '',
+      hsCode: productsList[0]?.hsCode?.trim() || formData.hsCode?.trim() || '',
       boxLengthCm:
         formData.boxLengthCm !== undefined && formData.boxLengthCm !== null && String(formData.boxLengthCm).trim() !== '' && !isNaN(Number(formData.boxLengthCm))
           ? Number(formData.boxLengthCm)
@@ -826,9 +1006,11 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
           ? Number(formData.pcsPerBox)
           : undefined,
       unitWeightG:
-        formData.unitWeightG !== undefined && formData.unitWeightG !== null && String(formData.unitWeightG).trim() !== '' && !isNaN(Number(formData.unitWeightG))
-          ? Number(formData.unitWeightG)
-          : undefined,
+        productsList[0]?.unitWeightG !== undefined
+          ? productsList[0].unitWeightG
+          : (formData.unitWeightG !== undefined && formData.unitWeightG !== null && String(formData.unitWeightG).trim() !== '' && !isNaN(Number(formData.unitWeightG))
+            ? Number(formData.unitWeightG)
+            : undefined),
       grossWeightKg:
         formData.grossWeightKg !== undefined && formData.grossWeightKg !== null && String(formData.grossWeightKg).trim() !== '' && !isNaN(Number(formData.grossWeightKg))
           ? Number(formData.grossWeightKg)
@@ -839,7 +1021,7 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
           : undefined,
       productUrl1688: selectedQuote?.productUrl1688 || '',
       supplierName: selectedQuote?.supplierName || '',
-      quantity: Number(formData.quantity) || 1,
+      quantity: finalQuantity,
       quantityUnit: formData.quantityUnit || 'pcs',
       targetPriceUsd:
         formData.targetPriceUsd !== undefined && formData.targetPriceUsd !== null && String(formData.targetPriceUsd).trim() !== '' && !isNaN(Number(formData.targetPriceUsd))
@@ -1107,121 +1289,326 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
             </div>
           </div>
 
-          {/* Section 2: Product Specifications & Packaging Details */}
+          {/* Section 2: Product Specifications & Multi-Product Management */}
           <div className="bg-slate-50 border border-slate-200 rounded-lg p-3.5 space-y-3.5">
-            <div className="flex items-center justify-between">
-              <h3 className="text-[11px] uppercase font-bold tracking-wider text-slate-700 flex items-center gap-1.5">
-                <Package className="w-3.5 h-3.5 text-indigo-600" />
-                <span>Product Specifications & Details</span>
-              </h3>
-              <span className="text-[10px] text-slate-400">
-                Packaging specs, master carton dimensions & CBM
-              </span>
-            </div>
-
-            {/* Product Name & Image Upload */}
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-start">
-              <div className="sm:col-span-3 space-y-2.5">
-                <div>
-                  <label className="block text-[11px] font-medium text-slate-700 mb-1">
-                    Product Name / Description <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    id="modal-product-name-input"
-                    type="text"
-                    required
-                    placeholder="e.g. Double-Wall Glass Coffee Mugs (350ml)"
-                    value={formData.product || ''}
-                    onChange={(e) => setFormData({ ...formData, product: e.target.value })}
-                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs text-slate-900 focus:outline-none focus:border-indigo-500 shadow-xs font-medium"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                      Material / Composition
-                    </label>
-                    <input
-                      id="modal-material-input"
-                      type="text"
-                      placeholder="e.g. High Borosilicate Glass, Silicone"
-                      value={formData.material || ''}
-                      onChange={(e) => setFormData({ ...formData, material: e.target.value })}
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs text-slate-800 focus:outline-none focus:border-indigo-500 shadow-xs"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                      Color / Finish / Variants
-                    </label>
-                    <input
-                      id="modal-color-variant-input"
-                      type="text"
-                      placeholder="e.g. Matte Black / Amber / Custom Logo"
-                      value={formData.colorVariant || ''}
-                      onChange={(e) => setFormData({ ...formData, colorVariant: e.target.value })}
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs text-slate-800 focus:outline-none focus:border-indigo-500 shadow-xs"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Image Upload Tile */}
-              <div className="sm:col-span-1 flex flex-col">
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                  Product Image
-                </label>
-                <div 
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex flex-col items-center justify-center border border-dashed border-slate-300 bg-white hover:bg-slate-50 cursor-pointer rounded-lg p-2 h-28 transition-colors relative overflow-hidden group shadow-xs"
-                >
-                  <input 
-                    id="modal-image-file-input"
-                    type="file" 
-                    ref={fileInputRef} 
-                    className="hidden" 
-                    accept="image/*" 
-                    onChange={handleImageUpload} 
-                  />
-                  {isCompressingImage ? (
-                    <div className="text-center text-indigo-600 flex flex-col items-center justify-center">
-                      <RefreshCw className="w-5 h-5 mb-1 animate-spin" />
-                      <span className="text-[10px] font-medium">Compressing...</span>
-                    </div>
-                  ) : formData.imageUrl ? (
-                    <>
-                      <img
-                        src={formData.imageUrl}
-                        alt="Product Preview"
-                        className="w-full h-full object-contain rounded"
-                        referrerPolicy="no-referrer"
-                      />
-                      <div className="absolute inset-0 bg-slate-900/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <RefreshCw className="w-4 h-4 text-white mb-1" />
-                        <span className="text-[10px] text-white font-semibold">Change Photo</span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setFormData({ ...formData, imageUrl: '' });
-                          }}
-                          className="mt-1 text-[9px] text-rose-300 hover:text-rose-100 underline"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-center text-slate-400 flex flex-col items-center justify-center group-hover:text-indigo-600 transition-colors">
-                      <ImageIcon className="w-6 h-6 mb-1 text-slate-400 group-hover:text-indigo-600" />
-                      <span className="text-[11px] font-medium text-slate-600 group-hover:text-indigo-600">Upload Photo</span>
-                      <span className="text-[9px] text-slate-400">Click or drag</span>
-                    </div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-2.5">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xs uppercase font-bold tracking-wider text-slate-800 flex items-center gap-1.5">
+                    <Package className="w-4 h-4 text-indigo-600" />
+                    <span>Product Specifications & Items</span>
+                  </h3>
+                  {productsList.length > 1 && (
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-700 border border-indigo-200">
+                      {productsList.length} Products / Variants
+                    </span>
                   )}
                 </div>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Add multiple products, different colors, finishes, and quantities for this client
+                </p>
               </div>
+
+              <button
+                type="button"
+                id="modal-add-product-btn"
+                onClick={handleAddProduct}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer self-start sm:self-auto"
+                title="Add another product or color variant to this inquiry"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Product / Color</span>
+              </button>
+            </div>
+
+            {/* List of Products / Variants */}
+            <div className="space-y-3">
+              {productsList.map((productItem, prodIdx) => {
+                const isOnlyOne = productsList.length === 1;
+                return (
+                  <div
+                    key={productItem.id || `prod_${prodIdx}`}
+                    className={`border rounded-lg p-3.5 transition-all ${
+                      productsList.length > 1
+                        ? 'bg-white border-slate-200 shadow-2xs hover:border-indigo-200'
+                        : 'bg-white border-slate-200'
+                    }`}
+                  >
+                    {/* Header bar for multi-product items */}
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="px-2 py-0.5 rounded bg-indigo-50 border border-indigo-200 text-indigo-700 font-mono font-bold text-xs">
+                          Item #{prodIdx + 1}
+                        </span>
+                        <span className="font-semibold text-xs text-slate-800 truncate">
+                          {productItem.productName?.trim() || `Product #${prodIdx + 1}`}
+                        </span>
+                        {productItem.colorVariant && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-medium truncate">
+                            <Palette className="w-2.5 h-2.5 text-amber-600" />
+                            {productItem.colorVariant}
+                          </span>
+                        )}
+                        <span className="text-[11px] font-semibold text-slate-600">
+                          ({Number(productItem.quantity || 0).toLocaleString()} {productItem.quantityUnit || 'pcs'})
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        {/* 1-Click Duplicate / Add Another Color */}
+                        <button
+                          type="button"
+                          onClick={() => handleDuplicateProduct(prodIdx)}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 transition border border-transparent hover:border-indigo-200"
+                          title="Duplicate this product with same specs (ideal for adding another color or size)"
+                        >
+                          <Copy className="w-3 h-3" />
+                          <span className="hidden sm:inline">Duplicate / Add Color</span>
+                        </button>
+
+                        {/* Reorder Up/Down */}
+                        {productsList.length > 1 && (
+                          <div className="flex items-center border border-slate-200 rounded">
+                            <button
+                              type="button"
+                              disabled={prodIdx === 0}
+                              onClick={() => handleMoveProduct(prodIdx, 'up')}
+                              className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 transition"
+                              title="Move product up"
+                            >
+                              <ArrowUp className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={prodIdx === productsList.length - 1}
+                              onClick={() => handleMoveProduct(prodIdx, 'down')}
+                              className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 transition border-l border-slate-200"
+                              title="Move product down"
+                            >
+                              <ArrowDown className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Remove button */}
+                        {!isOnlyOne && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveProduct(prodIdx)}
+                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition"
+                            title="Remove this product"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Product Fields */}
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-start">
+                      <div className="sm:col-span-3 space-y-2.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                          <div className="sm:col-span-2">
+                            <label className="block text-[11px] font-medium text-slate-700 mb-1">
+                              Product Name / Description <span className="text-rose-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="e.g. Double-Wall Glass Coffee Mugs (350ml)"
+                              value={productItem.productName || ''}
+                              onChange={(e) => handleUpdateProduct(prodIdx, 'productName', e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded text-xs text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white shadow-xs font-medium"
+                            />
+                          </div>
+
+                          <div className="sm:col-span-1">
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">
+                              <Palette className="w-3 h-3 text-indigo-500" />
+                              <span>Color / Finish / Size</span>
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Matte Black / Amber / XL"
+                              value={productItem.colorVariant || ''}
+                              onChange={(e) => handleUpdateProduct(prodIdx, 'colorVariant', e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800 focus:outline-none focus:border-indigo-500 focus:bg-white shadow-xs"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                              Quantity for this Item <span className="text-rose-500">*</span>
+                            </label>
+                            <div className="flex rounded-md shadow-xs">
+                              <input
+                                type="number"
+                                min="1"
+                                step="any"
+                                required
+                                placeholder="e.g. 500"
+                                value={productItem.quantity || ''}
+                                onChange={(e) =>
+                                  handleUpdateProduct(
+                                    prodIdx,
+                                    'quantity',
+                                    e.target.value !== '' ? Math.max(1, Number(e.target.value)) : 1
+                                  )
+                                }
+                                className="flex-1 min-w-0 px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-l text-xs font-bold text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white"
+                              />
+                              <select
+                                value={productItem.quantityUnit || formData.quantityUnit || 'pcs'}
+                                onChange={(e) => {
+                                  handleUpdateProduct(prodIdx, 'quantityUnit', e.target.value);
+                                  if (prodIdx === 0) setFormData(prev => ({ ...prev, quantityUnit: e.target.value }));
+                                }}
+                                className="px-2 py-1.5 bg-slate-100 border border-l-0 border-slate-300 rounded-r text-xs font-semibold text-slate-700 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                              >
+                                <option value="pcs">pcs</option>
+                                <option value="sets">sets</option>
+                                <option value="pairs">pairs</option>
+                                <option value="packs">packs</option>
+                                <option value="rolls">rolls</option>
+                                <option value="boxes">boxes</option>
+                                <option value="ctns">ctns</option>
+                                <option value="meters">meters</option>
+                                <option value="kg">kg</option>
+                                <option value="units">units</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                              Material / Composition
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. High Borosilicate Glass"
+                              value={productItem.material || ''}
+                              onChange={(e) => handleUpdateProduct(prodIdx, 'material', e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800 focus:outline-none focus:border-indigo-500 focus:bg-white shadow-xs"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                              Client Target Price ($)
+                            </label>
+                            <div className="relative">
+                              <span className="absolute left-2.5 top-1.5 text-slate-400 text-xs">$</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="any"
+                                placeholder="e.g. 2.50"
+                                value={productItem.targetPriceUsd ?? ''}
+                                onChange={(e) =>
+                                  handleUpdateProduct(
+                                    prodIdx,
+                                    'targetPriceUsd',
+                                    e.target.value === '' ? undefined : Number(e.target.value)
+                                  )
+                                }
+                                className="w-full pl-6 pr-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800 font-mono focus:outline-none focus:border-indigo-500 focus:bg-white shadow-xs"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Optional Sourcing Link / Specs note */}
+                        <div className="pt-0.5">
+                          <input
+                            type="text"
+                            placeholder="Optional 1688 / Supplier link or specific notes for this product..."
+                            value={productItem.supplierUrl || ''}
+                            onChange={(e) => handleUpdateProduct(prodIdx, 'supplierUrl', e.target.value)}
+                            className="w-full px-2 py-1 bg-slate-50/70 border border-slate-200 rounded text-[11px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Product Image Tile for this item */}
+                      <div className="sm:col-span-1 flex flex-col">
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                          Product Image
+                        </label>
+                        <div
+                          onClick={() => document.getElementById(`modal-product-img-input-${prodIdx}`)?.click()}
+                          className="flex flex-col items-center justify-center border border-dashed border-slate-300 bg-white hover:bg-slate-50 cursor-pointer rounded-lg p-2 h-28 transition-colors relative overflow-hidden group shadow-xs"
+                        >
+                          <input
+                            id={`modal-product-img-input-${prodIdx}`}
+                            type="file"
+                            className="hidden"
+                            accept="image/*"
+                            onChange={(e) => handleProductItemImageUpload(prodIdx, e)}
+                          />
+                          {productItem.imageUrl ? (
+                            <>
+                              <img
+                                src={productItem.imageUrl}
+                                alt={productItem.productName || 'Product'}
+                                className="w-full h-full object-contain rounded"
+                                referrerPolicy="no-referrer"
+                              />
+                              <div className="absolute inset-0 bg-slate-900/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <RefreshCw className="w-4 h-4 text-white mb-1" />
+                                <span className="text-[10px] text-white font-semibold">Change Photo</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleUpdateProduct(prodIdx, 'imageUrl', '');
+                                    if (prodIdx === 0) setFormData(prev => ({ ...prev, imageUrl: '' }));
+                                  }}
+                                  className="mt-1 text-[9px] text-rose-300 hover:text-rose-100 underline"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-center text-slate-400 flex flex-col items-center justify-center group-hover:text-indigo-600 transition-colors">
+                              <ImageIcon className="w-5 h-5 mb-1 text-slate-400 group-hover:text-indigo-600" />
+                              <span className="text-[10px] font-medium text-slate-600 group-hover:text-indigo-600">
+                                {productsList.length > 1 ? `Upload #${prodIdx + 1}` : 'Upload Photo'}
+                              </span>
+                              <span className="text-[9px] text-slate-400">Click to upload</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Quick Action: Add Another Product / Color Button */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-1">
+              <button
+                type="button"
+                onClick={handleAddProduct}
+                className="w-full sm:w-auto px-4 py-2 border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/50 hover:bg-indigo-50 rounded-lg text-xs font-semibold text-indigo-700 flex items-center justify-center gap-1.5 transition cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Add Another Product / Color Variant</span>
+              </button>
+
+              {productsList.length > 1 && (
+                <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg px-3 py-1.5 shadow-2xs">
+                  <span className="text-slate-500 font-normal">Combined Total:</span>
+                  <span className="text-indigo-600 font-bold font-mono">
+                    {productsList.reduce((acc, p) => acc + (Number(p.quantity) || 0), 0).toLocaleString()} {formData.quantityUnit || 'pcs'}
+                  </span>
+                  <span className="text-slate-400">•</span>
+                  <span>{productsList.length} items</span>
+                </div>
+              )}
             </div>
 
             {/* Additional Standard Specs: Packaging Type, HS Code, Unit Weight */}

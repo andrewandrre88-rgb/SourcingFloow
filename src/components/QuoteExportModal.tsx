@@ -41,6 +41,15 @@ export const QuoteExportModal: React.FC<QuoteExportModalProps> = ({
   const unitPriceFormatted = formatUnitPrice(item.clientUnitPriceUsd || 0, 'USD');
   const totalQuotationFormatted = formatCurrency(item.totalQuotationUsd || 0, 'USD');
 
+  const productsBreakdownText = item.products && item.products.length > 1
+    ? `*Requested Items & Quantities (${item.products.length} Products/Variants):*\n` +
+      item.products.map((p, idx) => `  ${idx + 1}. ${p.productName || item.product}${p.colorVariant ? ` [Color/Variant: ${p.colorVariant}]` : ''} - ${Number(p.quantity).toLocaleString()} ${p.quantityUnit || unitLabel}`).join('\n') +
+      `\n*Total Order Quantity:* ${Number(item.quantity).toLocaleString()} ${unitLabel}\n`
+    : `*Product:* ${item.product}\n` +
+      (item.material ? `*Material:* ${item.material}\n` : '') +
+      (item.colorVariant ? `*Color / Finish:* ${item.colorVariant}\n` : '') +
+      `*Order Quantity:* ${Number(item.quantity).toLocaleString()} ${unitLabel}\n`;
+
   const quoteText = `📋 *SOURCING QUOTATION SUMMARY*
 ----------------------------------------
 *Inquiry Ref:* ${item.inquiryNumber}
@@ -48,9 +57,7 @@ export const QuoteExportModal: React.FC<QuoteExportModalProps> = ({
 *Client:* ${item.customerName}
 ${item.customerContact ? `*Contact:* ${item.customerContact}\n` : ''}${item.wechatId ? `*WeChat ID:* ${item.wechatId}\n` : ''}*Destination:* ${item.country}
 
-*Product:* ${item.product}
-${item.material ? `*Material:* ${item.material}\n` : ''}${item.colorVariant ? `*Color / Finish:* ${item.colorVariant}\n` : ''}${item.packagingType ? `*Packaging:* ${item.packagingType}\n` : ''}${item.hsCode ? `*HS Code:* ${item.hsCode}\n` : ''}*Order Quantity:* ${Number(item.quantity).toLocaleString()} ${unitLabel}
-${item.moq ? `*Supplier MOQ:* ${item.moq.toLocaleString()} ${unitLabel}\n` : ''}${item.sampleQuantity ? `*Sample Quantity:* ${item.sampleQuantity} ${unitLabel}\n` : ''}${item.quantityTolerancePercent ? `*Quantity Tolerance:* ±${item.quantityTolerancePercent}%\n` : ''}${item.deliveryLeadTimeDays ? `*Production Lead Time:* ${item.deliveryLeadTimeDays} days\n` : ''}*Unit Price:* ${unitPriceFormatted} / ${unitLabel}
+${productsBreakdownText}${item.packagingType ? `*Packaging:* ${item.packagingType}\n` : ''}${item.hsCode ? `*HS Code:* ${item.hsCode}\n` : ''}${item.moq ? `*Supplier MOQ:* ${item.moq.toLocaleString()} ${unitLabel}\n` : ''}${item.sampleQuantity ? `*Sample Quantity:* ${item.sampleQuantity} ${unitLabel}\n` : ''}${item.quantityTolerancePercent ? `*Quantity Tolerance:* ±${item.quantityTolerancePercent}%\n` : ''}${item.deliveryLeadTimeDays ? `*Production Lead Time:* ${item.deliveryLeadTimeDays} days\n` : ''}*Unit Price:* ${unitPriceFormatted} / ${unitLabel}
 *Total Order Amount:* ${totalQuotationFormatted}
 *Status:* ${item.orderStatus}
 
@@ -113,11 +120,28 @@ Let us know if you would like to proceed with a sample or place the bulk order!`
             </div>
           </div>
 
-          <div className="space-y-0.5">
-            <div className="text-slate-500 font-bold uppercase text-[10px]">Product & Quantity</div>
-            <div className="text-slate-900 font-medium text-xs">{item.product}</div>
+          <div className="space-y-1">
+            <div className="text-slate-500 font-bold uppercase text-[10px]">
+              {item.products && item.products.length > 1 ? `Requested Products (${item.products.length} Items)` : 'Product & Quantity'}
+            </div>
+            {item.products && item.products.length > 1 ? (
+              <div className="space-y-1 bg-white p-2 rounded border border-slate-200">
+                {item.products.map((p, i) => (
+                  <div key={p.id || i} className="flex justify-between items-center text-xs">
+                    <span className="text-slate-800 font-medium">
+                      #{i + 1} {p.productName || item.product} {p.colorVariant ? <span className="text-amber-800 font-normal">({p.colorVariant})</span> : ''}
+                    </span>
+                    <span className="font-mono font-bold text-indigo-700">
+                      {Number(p.quantity).toLocaleString()} {p.quantityUnit || unitLabel}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-slate-900 font-medium text-xs">{item.product}</div>
+            )}
             <div className="text-indigo-600 font-bold text-xs">
-              {Number(item.quantity).toLocaleString()} {unitLabel}
+              Total: {Number(item.quantity).toLocaleString()} {unitLabel}
               {item.moq && <span className="text-slate-400 font-normal ml-1">(MOQ: {item.moq.toLocaleString()})</span>}
               {item.deliveryLeadTimeDays && <span className="text-slate-500 font-medium ml-2">• {item.deliveryLeadTimeDays}d Lead Time</span>}
             </div>

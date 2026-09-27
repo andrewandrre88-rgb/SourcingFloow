@@ -40,6 +40,24 @@ export interface HelperCommission {
 
 export type MarginMode = 'percent' | 'fixed_usd' | 'fixed_rmb' | 'deal_usd' | 'deal_rmb';
 
+export interface InquiryProductItem {
+  id: string; // Unique ID (e.g. prod_1)
+  productName: string; // Product name & brief spec (e.g. "Double-Wall Glass Coffee Mugs")
+  colorVariant?: string; // Color / Finish / Variant / Size (e.g. "Matte Black", "Amber 350ml", "Size XL")
+  quantity: number; // Order quantity for this product/variant
+  quantityUnit?: string; // 'pcs', 'sets', 'pairs', 'packs', 'rolls', 'boxes', 'ctns', 'meters', 'kg', 'units'
+  material?: string; // Material / Composition
+  targetPriceUsd?: number; // Client's target budget price per unit in USD ($)
+  targetPriceRmb?: number; // Client's target budget price per unit in RMB (¥)
+  price1688Rmb?: number; // Factory unit cost in RMB (¥)
+  clientUnitPriceUsd?: number; // Quoted client unit price in USD ($)
+  imageUrl?: string; // Product Image URL
+  supplierUrl?: string; // 1688 or factory product URL
+  hsCode?: string; // Customs HS Code
+  unitWeightG?: number; // Unit weight in grams
+  notes?: string; // Special requirements / specs
+}
+
 export interface InquiryItem {
   id: string; // Unique ID (e.g. INQ-2026-001 or UUID)
   inquiryNumber: string; // e.g. INQ-1001
@@ -52,7 +70,8 @@ export interface InquiryItem {
   clientPhone?: string; // Client phone number
   wechatId?: string; // WeChat ID
   country: string; // Country of destination
-  product: string; // Product name & brief spec
+  product: string; // Product name & brief spec (primary or composite)
+  products?: InquiryProductItem[]; // List of multiple products/colors/quantities requested by client
   imageUrl?: string; // Product Image URL
   material?: string; // Material / Composition (e.g. Borosilicate Glass, 304 Stainless Steel)
   colorVariant?: string; // Color / Finish / Variant (e.g. Matte Black, Brushed Gold)

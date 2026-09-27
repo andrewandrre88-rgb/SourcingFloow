@@ -22,6 +22,8 @@ import {
   ArrowUpToLine,
   ArrowUp,
   ArrowDown,
+  Layers,
+  Palette,
 } from 'lucide-react';
 import { InquiryItem, OrderStatus, CurrencyViewMode, Customer, ExchangeRates } from '../types';
 import {
@@ -649,12 +651,45 @@ Please let us know if you need any adjustments or would like to proceed with a s
                           </div>
                         )}
                         <div className="min-w-0 flex-1">
-                          <div className="text-xs text-slate-800 font-medium truncate" title={item.product}>
-                            {item.product}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs text-slate-800 font-medium truncate" title={item.product}>
+                              {item.product}
+                            </span>
+                            {item.products && item.products.length > 1 && (
+                              <span
+                                className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-bold bg-indigo-50 border border-indigo-200 text-indigo-700 shrink-0 shadow-2xs"
+                                title={`${item.products.length} Products/Variants:\n` + item.products.map((p, i) => `${i + 1}. ${p.productName || 'Item'}${p.colorVariant ? ` (${p.colorVariant})` : ''}: ${Number(p.quantity).toLocaleString()} ${p.quantityUnit || 'pcs'}`).join('\n')}
+                              >
+                                <Layers className="w-2.5 h-2.5 text-indigo-500" />
+                                <span>{item.products.length} Products</span>
+                              </span>
+                            )}
                           </div>
+                          {item.products && item.products.length > 1 && (
+                            <div className="flex flex-wrap items-center gap-1 mt-0.5 text-[10px]">
+                              {item.products.slice(0, 3).map((p, pIdx) => (
+                                <span
+                                  key={p.id || pIdx}
+                                  className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 border border-slate-200 text-[10px]"
+                                >
+                                  {p.colorVariant ? (
+                                    <span className="text-amber-800 font-medium">{p.colorVariant}</span>
+                                  ) : (
+                                    <span>#{pIdx + 1}</span>
+                                  )}
+                                  <span className="text-slate-500 font-mono font-bold">({p.quantity})</span>
+                                </span>
+                              ))}
+                              {item.products.length > 3 && (
+                                <span className="text-slate-400 font-medium text-[9px]">
+                                  +{item.products.length - 3} more
+                                </span>
+                              )}
+                            </div>
+                          )}
                           <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
                             <span className="font-semibold text-slate-700">
-                              {Number(item.quantity || 1).toLocaleString()} {item.quantityUnit || 'pcs'}
+                              {Number(item.quantity || 1).toLocaleString()} {item.quantityUnit || 'pcs'} total
                             </span>
                             {item.targetPriceUsd && (
                               <span
@@ -1082,14 +1117,37 @@ Please let us know if you need any adjustments or would like to proceed with a s
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-slate-900 group-hover:text-indigo-600 transition truncate">
-                      {item.product}
+                    <div className="text-sm font-semibold text-slate-900 group-hover:text-indigo-600 transition truncate flex items-center gap-1.5 flex-wrap">
+                      <span>{item.product}</span>
+                      {item.products && item.products.length > 1 && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-bold bg-indigo-50 border border-indigo-200 text-indigo-700 shrink-0">
+                          <Layers className="w-2.5 h-2.5 text-indigo-500" />
+                          <span>{item.products.length} Products</span>
+                        </span>
+                      )}
                     </div>
+                    {item.products && item.products.length > 1 && (
+                      <div className="flex flex-wrap items-center gap-1 mt-1 text-[10px]">
+                        {item.products.slice(0, 3).map((p, pIdx) => (
+                          <span
+                            key={p.id || pIdx}
+                            className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 border border-slate-200"
+                          >
+                            {p.colorVariant ? (
+                              <span className="text-amber-800 font-medium">{p.colorVariant}</span>
+                            ) : (
+                              <span>#{pIdx + 1}</span>
+                            )}
+                            <span className="text-slate-500 font-mono font-bold">({p.quantity})</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     <div className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
                       <span className="font-bold text-slate-800">
                         {Number(item.quantity || 1).toLocaleString()}
                       </span>
-                      <span>{item.quantityUnit || 'pcs'}</span>
+                      <span>{item.quantityUnit || 'pcs'} total</span>
                       {item.supplierName && (
                         <>
                           <span className="text-slate-300">•</span>
