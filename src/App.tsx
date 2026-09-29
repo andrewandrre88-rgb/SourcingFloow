@@ -63,6 +63,8 @@ import {
   subscribeToTasks,
   saveTaskToFirestore,
   deleteTaskFromFirestore,
+  migrateLocalTasksToFirestoreIfEmpty,
+  batchSaveTasksToFirestore,
 } from './lib/tasksDb';
 import {
   CheckCircle2,
@@ -194,15 +196,21 @@ export default function App() {
 
   const handleManualSync = async () => {
     if (!user) return;
-    setSyncState(prev => ({ ...prev, isSyncing: true }));
+    setSyncState((prev) => ({ ...prev, isSyncing: true }));
     try {
-      showToast('Syncing with Cloud Firestore...', 'info');
-      setTimeout(() => {
-        setSyncState(prev => ({ ...prev, isSyncing: false, lastSyncedAt: new Date().toISOString() }));
-      }, 1000);
-    } catch (err) {
+      showToast('Syncing all tasks & inquiries with Cloud Firestore...', 'info');
+      await batchSaveTasksToFirestore(user.uid, tasks);
+      setSyncState((prev) => ({
+        ...prev,
+        isSyncing: false,
+        status: 'connected',
+        lastSyncedAt: new Date().toISOString(),
+      }));
+      showToast('All tasks & inquiries synchronized across all devices!', 'success');
+    } catch (err: any) {
       console.error(err);
-      setSyncState(prev => ({ ...prev, isSyncing: false, error: 'Sync failed' }));
+      setSyncState((prev) => ({ ...prev, isSyncing: false, error: 'Sync failed' }));
+      showToast('Sync issue: ' + (err?.message || 'Check connection'), 'error');
     }
   };
 
@@ -846,10 +854,8 @@ export default function App() {
     const unsubTasks = subscribeToTasks(
       user.uid,
       (data) => {
-        if (data && data.length > 0) {
-          setTasks(data);
-          saveLocalTasks(data);
-        }
+        setTasks(data);
+        saveLocalTasks(data);
       },
       (error) => {
         console.warn('[Firestore] Tasks listener warning:', error.message);
@@ -864,6 +870,16 @@ export default function App() {
       })
       .catch((err) => {
         console.warn('[Firestore] Migration check warning:', err);
+      });
+
+    migrateLocalTasksToFirestoreIfEmpty(user.uid, tasks)
+      .then((res) => {
+        if (res.migrated && res.count > 0) {
+          showToast(`Synced ${res.count} tasks across devices via Cloud Firestore`, 'success');
+        }
+      })
+      .catch((err) => {
+        console.warn('[Firestore] Tasks migration warning:', err);
       });
 
     syncUserProfile(user).catch((err) => {
@@ -1035,6 +1051,9 @@ export default function App() {
             tasks={tasks}
             inquiries={inquiries}
             customers={customers}
+            user={user}
+            syncState={syncState}
+            onSync={handleManualSync}
             onAddTask={() => {
               setTaskToEdit(null);
               setIsTaskModalOpen(true);

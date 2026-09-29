@@ -461,6 +461,69 @@
           "required": true
         }
       }
+    },
+    "SourcingTask": {
+      "collection": "users/{userId}/tasks",
+      "path": "/users/{userId}/tasks/{taskId}",
+      "description": "Actionable sourcing to-dos, factory milestones, QC checks, deadlines and priority tasks",
+      "fields": {
+        "id": {
+          "type": "string",
+          "required": true
+        },
+        "title": {
+          "type": "string",
+          "required": true
+        },
+        "description": {
+          "type": "string",
+          "required": false
+        },
+        "priority": {
+          "type": "string",
+          "required": true
+        },
+        "status": {
+          "type": "string",
+          "required": true
+        },
+        "category": {
+          "type": "string",
+          "required": true
+        },
+        "dueDate": {
+          "type": "string",
+          "required": false
+        },
+        "linkedInquiryId": {
+          "type": "string",
+          "required": false
+        },
+        "linkedInquiryNumber": {
+          "type": "string",
+          "required": false
+        },
+        "clientName": {
+          "type": "string",
+          "required": false
+        },
+        "completedAt": {
+          "type": "string",
+          "required": false
+        },
+        "orderIndex": {
+          "type": "number",
+          "required": false
+        },
+        "createdAt": {
+          "type": "string",
+          "required": true
+        },
+        "updatedAt": {
+          "type": "string",
+          "required": true
+        }
+      }
     }
   },
   "securityRules": {

@@ -343,7 +343,7 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   <span>Tasks</span>
                   {urgentTaskCount > 0 && (
-                    <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-2xs animate-pulse">
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-2xs animate-pulse">
                       {urgentTaskCount}
                     </span>
                   )}
