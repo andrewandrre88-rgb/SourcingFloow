@@ -23,7 +23,7 @@ import {
   calculateInquiryPricing,
 } from './lib/currency';
 import { SAMPLE_INQUIRIES } from './lib/sampleData';
-import { InquiryItem, OrderStatus, CloudSyncState, ExchangeRates, CurrencyViewMode, Customer, ServiceRequest, ServiceStatus } from './types';
+import { InquiryItem, OrderStatus, CloudSyncState, ExchangeRates, CurrencyViewMode, Customer, ServiceRequest, ServiceStatus, SourcingTask, TaskPriority, TaskCategory, ExpenseItem } from './types';
 import { Header } from './components/Header';
 import { StatsBar } from './components/StatsBar';
 import { InquiryTable } from './components/InquiryTable';
@@ -40,7 +40,8 @@ import { ServiceModal } from './components/ServiceModal';
 import { ServiceDetailModal } from './components/ServiceDetailModal';
 import { ExpensesPage } from './components/ExpensesPage';
 import { ExpenseModal } from './components/ExpenseModal';
-import { ExpenseItem } from './types';
+import { TasksPage } from './components/TasksPage';
+import { TaskModal } from './components/TaskModal';
 import { subscribeToCustomers, saveCustomerToFirestore, deleteCustomerFromFirestore } from './lib/customersDb';
 import {
   subscribeToServices,
@@ -56,6 +57,13 @@ import {
   getLocalExpenses,
   saveLocalExpenses,
 } from './lib/expensesDb';
+import {
+  loadLocalTasks,
+  saveLocalTasks,
+  subscribeToTasks,
+  saveTaskToFirestore,
+  deleteTaskFromFirestore,
+} from './lib/tasksDb';
 import {
   CheckCircle2,
   AlertCircle,
@@ -108,7 +116,8 @@ export default function App() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [services, setServices] = useState<ServiceRequest[]>(getLocalServices);
   const [expenses, setExpenses] = useState<ExpenseItem[]>(getLocalExpenses);
-  const [currentView, setCurrentView] = useState<'inquiries' | 'customers' | 'services'>('inquiries');
+  const [tasks, setTasks] = useState<SourcingTask[]>(loadLocalTasks);
+  const [currentView, setCurrentView] = useState<'inquiries' | 'customers' | 'services' | 'tasks'>('inquiries');
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [customerToEdit, setCustomerToEdit] = useState<Customer | null>(null);
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
@@ -116,6 +125,13 @@ export default function App() {
   const [serviceToView, setServiceToView] = useState<ServiceRequest | null>(null);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [expenseToEdit, setExpenseToEdit] = useState<ExpenseItem | null>(null);
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [taskToEdit, setTaskToEdit] = useState<SourcingTask | null>(null);
+
+  // Urgent / High priority task metrics for header badge
+  const urgentTaskCount = tasks.filter(
+    (t) => (t.priority === 'urgent' || t.priority === 'high') && t.status !== 'completed'
+  ).length;
 
   // Core Data State
   const [inquiries, setInquiries] = useState<InquiryItem[]>(() => {
@@ -283,6 +299,111 @@ export default function App() {
     }
   };
 
+  const handleSplitInquiry = async (item: InquiryItem) => {
+    if (!item.products || item.products.length <= 1) return;
+
+    const rate = exchangeRates.USD_TO_RMB > 0 ? exchangeRates.USD_TO_RMB : 7.25;
+    const year = new Date().getFullYear();
+    const prefix = `INQ-${year}-`;
+
+    let maxSeq = 0;
+    inquiries.forEach((it) => {
+      if (it.inquiryNumber && it.inquiryNumber.startsWith(prefix)) {
+        const numPart = parseInt(it.inquiryNumber.slice(prefix.length), 10);
+        if (!isNaN(numPart) && numPart > maxSeq) {
+          maxSeq = numPart;
+        }
+      }
+    });
+
+    const usedNumbers = new Set(inquiries.map((it) => it.inquiryNumber));
+    const assignedNumbers: string[] = [item.inquiryNumber];
+    usedNumbers.add(item.inquiryNumber);
+
+    let nextSeq = maxSeq + 1;
+    for (let i = 1; i < item.products.length; i++) {
+      let candidate = `${prefix}${String(nextSeq).padStart(3, '0')}`;
+      while (usedNumbers.has(candidate)) {
+        nextSeq++;
+        candidate = `${prefix}${String(nextSeq).padStart(3, '0')}`;
+      }
+      assignedNumbers.push(candidate);
+      usedNumbers.add(candidate);
+      nextSeq++;
+    }
+
+    const separateItems: InquiryItem[] = item.products.map((prod, idx) => {
+      const prodName = prod.productName?.trim() || item.product;
+      const prodQty = Math.max(1, Number(prod.quantity) || 1);
+      const prodPrice1688 =
+        prod.price1688Rmb !== undefined && !isNaN(Number(prod.price1688Rmb))
+          ? Number(prod.price1688Rmb)
+          : item.price1688Rmb || 0;
+
+      const prodPricing = calculateInquiryPricing({
+        quantity: prodQty,
+        price1688Rmb: prodPrice1688,
+        domesticShippingRmb: item.domesticShippingRmb || 0,
+        marginPercent: item.marginPercent || 0,
+        marginFixedUsd: item.marginFixedUsd || 0,
+        usdToRmbRate: rate,
+      });
+
+      return {
+        ...item,
+        id: idx === 0 ? item.id : `inq_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
+        inquiryNumber: assignedNumbers[idx],
+        product: prodName,
+        products: [
+          {
+            ...prod,
+            id: prod.id || `prod_${Date.now()}_${idx}`,
+            productName: prodName,
+            clientUnitPriceUsd: prodPricing.clientUnitPriceUsd,
+          },
+        ],
+        colorVariant: prod.colorVariant || '',
+        quantity: prodQty,
+        material: prod.material || item.material || '',
+        imageUrl: prod.imageUrl || item.imageUrl || '',
+        price1688Rmb: prodPrice1688,
+        clientUnitPriceUsd: prodPricing.clientUnitPriceUsd,
+        totalQuotationUsd: prodPricing.totalQuotationUsd,
+        estimatedProfitUsd: prodPricing.estimatedProfitUsd,
+        notes: prod.notes || item.notes || '',
+        updatedAt: new Date().toISOString(),
+      };
+    });
+
+    // Replace the combined item with separate items in state
+    setInquiries((prev) => {
+      const filtered = prev.filter((i) => i.id !== item.id);
+      const next = [...separateItems, ...filtered];
+      try {
+        localStorage.setItem(STORAGE_KEY_LOCAL_INQUIRIES, JSON.stringify(next));
+      } catch (e) {
+        console.error('Failed to save split inquiries to localStorage:', e);
+      }
+      return next;
+    });
+
+    setItemToView(null);
+    showToast(`Successfully split into ${separateItems.length} separate inquiries!`, 'success');
+
+    if (user && user.uid) {
+      try {
+        setSyncState((prev) => ({ ...prev, isSyncing: true }));
+        for (const sep of separateItems) {
+          await saveInquiryToFirestore(user.uid, sep);
+        }
+        setSyncState((prev) => ({ ...prev, isSyncing: false }));
+      } catch (e) {
+        console.error('Failed to sync split inquiries to Firestore:', e);
+        setSyncState((prev) => ({ ...prev, isSyncing: false }));
+      }
+    }
+  };
+
   const handleReorderInquiries = async (reorderedItems: InquiryItem[]) => {
     // 1. Assign sequential orderIndex so priority order is strictly maintained
     const withOrder = reorderedItems.map((item, idx) => ({
@@ -312,27 +433,46 @@ export default function App() {
     }
   };
 
-  const handleSaveInquiry = async (savedItem: InquiryItem) => {
-    setInquiries(prev => {
-      const idx = prev.findIndex(i => i.id === savedItem.id);
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = savedItem;
-        return next;
+  const handleSaveInquiry = async (savedInput: InquiryItem | InquiryItem[]) => {
+    const itemsToSave = Array.isArray(savedInput) ? savedInput : [savedInput];
+
+    setInquiries((prev) => {
+      let next = [...prev];
+      for (const item of itemsToSave) {
+        const idx = next.findIndex((i) => i.id === item.id);
+        if (idx >= 0) {
+          next[idx] = item;
+        } else {
+          next = [item, ...next];
+        }
       }
-      return [savedItem, ...prev];
+      try {
+        localStorage.setItem(STORAGE_KEY_LOCAL_INQUIRIES, JSON.stringify(next));
+      } catch (e) {
+        console.error('Failed to persist inquiries to localStorage:', e);
+      }
+      return next;
     });
+
     setIsInquiryModalOpen(false);
     setInquiryToEdit(null);
-    
+
+    if (itemsToSave.length === 1) {
+      showToast(`Saved inquiry ${itemsToSave[0].inquiryNumber}`, 'success');
+    } else {
+      showToast(`Saved ${itemsToSave.length} separate inquiries for ${itemsToSave[0].customerName}`, 'success');
+    }
+
     if (user && user.uid) {
       try {
         setSyncState((prev) => ({ ...prev, isSyncing: true }));
-        await saveInquiryToFirestore(user.uid, savedItem);
-        showToast(`Saved inquiry ${savedItem.inquiryNumber}`, 'success');
-        setSyncState(prev => ({ ...prev, isSyncing: false }));
+        for (const item of itemsToSave) {
+          await saveInquiryToFirestore(user.uid, item);
+        }
+        setSyncState((prev) => ({ ...prev, isSyncing: false }));
       } catch (error: any) {
-        console.error('Failed to save inquiry to Firestore:', error);
+        console.error('Failed to save inquiries to Firestore:', error);
+        setSyncState((prev) => ({ ...prev, isSyncing: false }));
       }
     }
   };
@@ -504,6 +644,133 @@ export default function App() {
     }
   };
 
+  // ----------------- TO-DO / TASK HANDLERS -----------------
+  const handleSaveTask = async (task: SourcingTask) => {
+    setTasks((prev) => {
+      const idx = prev.findIndex((t) => t.id === task.id);
+      let next: SourcingTask[];
+      if (idx >= 0) {
+        next = [...prev];
+        next[idx] = task;
+      } else {
+        next = [task, ...prev];
+      }
+      saveLocalTasks(next);
+      return next;
+    });
+    setIsTaskModalOpen(false);
+    setTaskToEdit(null);
+    showToast(`Saved task "${task.title}"`, 'success');
+
+    if (user && user.uid) {
+      try {
+        await saveTaskToFirestore(user.uid, task);
+      } catch (error: any) {
+        console.error('Failed to save task to Firestore:', error);
+      }
+    }
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    setTasks((prev) => {
+      const next = prev.filter((t) => t.id !== taskId);
+      saveLocalTasks(next);
+      return next;
+    });
+    showToast('Task removed', 'info');
+
+    if (user && user.uid) {
+      try {
+        await deleteTaskFromFirestore(user.uid, taskId);
+      } catch (e) {
+        console.error('Failed to delete task from Firestore:', e);
+      }
+    }
+  };
+
+  const handleToggleTaskStatus = async (taskId: string) => {
+    const target = tasks.find((t) => t.id === taskId);
+    if (!target) return;
+    const isCompleted = target.status === 'completed';
+    const nextStatus = isCompleted ? 'todo' : 'completed';
+    const updated: SourcingTask = {
+      ...target,
+      status: nextStatus,
+      completedAt: nextStatus === 'completed' ? new Date().toISOString() : undefined,
+      updatedAt: new Date().toISOString(),
+    };
+    setTasks((prev) => {
+      const next = prev.map((t) => (t.id === taskId ? updated : t));
+      saveLocalTasks(next);
+      return next;
+    });
+    showToast(isCompleted ? 'Marked task as pending' : 'Task completed! Great job.', 'success');
+
+    if (user && user.uid) {
+      try {
+        await saveTaskToFirestore(user.uid, updated);
+      } catch (e) {
+        console.error('Failed to update task status in Firestore:', e);
+      }
+    }
+  };
+
+  const handleChangeTaskPriority = async (taskId: string, priority: TaskPriority) => {
+    const target = tasks.find((t) => t.id === taskId);
+    if (!target) return;
+    const updated: SourcingTask = {
+      ...target,
+      priority,
+      updatedAt: new Date().toISOString(),
+    };
+    setTasks((prev) => {
+      const next = prev.map((t) => (t.id === taskId ? updated : t));
+      saveLocalTasks(next);
+      return next;
+    });
+    showToast(`Priority changed to ${priority}`, 'info');
+
+    if (user && user.uid) {
+      try {
+        await saveTaskToFirestore(user.uid, updated);
+      } catch (e) {
+        console.error('Failed to update task priority in Firestore:', e);
+      }
+    }
+  };
+
+  const handleQuickAddTask = async (
+    title: string,
+    priority: TaskPriority,
+    category: TaskCategory,
+    dueDate?: string
+  ) => {
+    const newTask: SourcingTask = {
+      id: `task_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      title,
+      priority,
+      category,
+      status: 'todo',
+      dueDate,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setTasks((prev) => {
+      const next = [newTask, ...prev];
+      saveLocalTasks(next);
+      return next;
+    });
+    showToast(`Added priority task "${title}"`, 'success');
+
+    if (user && user.uid) {
+      try {
+        await saveTaskToFirestore(user.uid, newTask);
+      } catch (e) {
+        console.error('Failed to save new task to Firestore:', e);
+      }
+    }
+  };
+
   // Setup Firestore Subscriptions
   useEffect(() => {
     if (!user) return;
@@ -576,6 +843,19 @@ export default function App() {
       }
     );
 
+    const unsubTasks = subscribeToTasks(
+      user.uid,
+      (data) => {
+        if (data && data.length > 0) {
+          setTasks(data);
+          saveLocalTasks(data);
+        }
+      },
+      (error) => {
+        console.warn('[Firestore] Tasks listener warning:', error.message);
+      }
+    );
+
     migrateLocalDataToFirestoreIfEmpty(user.uid, inquiries, exchangeRates)
       .then((result) => {
         if (result.migrated && result.count > 0) {
@@ -596,6 +876,7 @@ export default function App() {
       unsubCustomers();
       unsubServices();
       unsubExpenses();
+      unsubTasks();
     };
   }, [user]);
 
@@ -660,15 +941,19 @@ export default function App() {
           } else if (currentView === 'customers') {
             setCustomerToEdit(null);
             setIsCustomerModalOpen(true);
-          } else {
+          } else if (currentView === 'services') {
             setServiceToEdit(null);
             setIsServiceModalOpen(true);
+          } else {
+            setTaskToEdit(null);
+            setIsTaskModalOpen(true);
           }
         }}
         onOpenRatesModal={() => setIsRatesModalOpen(true)}
         isLoggingIn={isLoggingIn}
         currentView={currentView}
         onViewChange={setCurrentView}
+        urgentTaskCount={urgentTaskCount}
       />
       
       <main className="flex-1 w-full max-w-none mx-auto px-3 sm:px-6 lg:px-8 xl:px-10 py-3.5 sm:py-6 space-y-4 sm:space-y-6 pb-24 sm:pb-8">
@@ -728,7 +1013,7 @@ export default function App() {
               setIsInquiryModalOpen(true);
             }}
           />
-        ) : (
+        ) : currentView === 'services' ? (
           <ServicesPage
             services={services}
             exchangeRates={exchangeRates}
@@ -745,6 +1030,27 @@ export default function App() {
             onDelete={handleDeleteService}
             onStatusChange={handleServiceStatusChange}
           />
+        ) : (
+          <TasksPage
+            tasks={tasks}
+            inquiries={inquiries}
+            customers={customers}
+            onAddTask={() => {
+              setTaskToEdit(null);
+              setIsTaskModalOpen(true);
+            }}
+            onEditTask={(task) => {
+              setTaskToEdit(task);
+              setIsTaskModalOpen(true);
+            }}
+            onDeleteTask={handleDeleteTask}
+            onToggleTaskStatus={handleToggleTaskStatus}
+            onChangeTaskPriority={handleChangeTaskPriority}
+            onQuickAddTask={handleQuickAddTask}
+            onViewInquiry={(inquiry) => {
+              setItemToView(inquiry);
+            }}
+          />
         )}
       </main>
 
@@ -759,9 +1065,12 @@ export default function App() {
             } else if (currentView === 'customers') {
               setCustomerToEdit(null);
               setIsCustomerModalOpen(true);
-            } else {
+            } else if (currentView === 'services') {
               setServiceToEdit(null);
               setIsServiceModalOpen(true);
+            } else {
+              setTaskToEdit(null);
+              setIsTaskModalOpen(true);
             }
           }}
           className="p-3 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg flex items-center justify-center transition active:scale-90"
@@ -795,6 +1104,7 @@ export default function App() {
           handleDeleteRequest(item);
         }}
         onStatusChange={handleStatusChange}
+        onSplitInquiry={handleSplitInquiry}
       />
       <InquiryModal
         isOpen={isInquiryModalOpen}
@@ -806,6 +1116,7 @@ export default function App() {
         inquiryToEdit={inquiryToEdit}
         exchangeRates={exchangeRates}
         existingCount={inquiries.length}
+        allInquiries={inquiries}
       />
       <DeleteConfirmModal
         isOpen={Boolean(itemToDelete)}
@@ -873,6 +1184,17 @@ export default function App() {
         expenseToEdit={expenseToEdit}
         exchangeRates={exchangeRates}
         existingExpenses={expenses}
+      />
+      <TaskModal
+        isOpen={isTaskModalOpen}
+        onClose={() => {
+          setIsTaskModalOpen(false);
+          setTaskToEdit(null);
+        }}
+        onSave={handleSaveTask}
+        taskToEdit={taskToEdit}
+        inquiries={inquiries}
+        customers={customers}
       />
       
       {/* Toast Notification */}

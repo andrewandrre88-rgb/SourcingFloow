@@ -28,8 +28,9 @@ interface HeaderProps {
   onOpenNewModal: () => void;
   onOpenRatesModal: () => void;
   isLoggingIn: boolean;
-  currentView: 'inquiries' | 'customers' | 'services';
-  onViewChange: (view: 'inquiries' | 'customers' | 'services') => void;
+  currentView: 'inquiries' | 'customers' | 'services' | 'tasks';
+  onViewChange: (view: 'inquiries' | 'customers' | 'services' | 'tasks') => void;
+  urgentTaskCount?: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -47,6 +48,7 @@ export const Header: React.FC<HeaderProps> = ({
   isLoggingIn,
   currentView,
   onViewChange,
+  urgentTaskCount = 0,
 }) => {
   const [copiedUid, setCopiedUid] = useState(false);
 
@@ -215,6 +217,21 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   Services
                 </button>
+                <button
+                  type="button"
+                  id="header-mobile-view-tasks-btn"
+                  onClick={() => onViewChange('tasks')}
+                  className={`py-1.5 px-1 rounded-md text-[11px] sm:text-xs font-semibold transition text-center truncate flex items-center justify-center gap-1 ${
+                    currentView === 'tasks'
+                      ? 'bg-white text-indigo-700 shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span>Tasks</span>
+                  {urgentTaskCount > 0 && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                  )}
+                </button>
               </div>
 
               {/* Currency View Toggle */}
@@ -313,6 +330,23 @@ export const Header: React.FC<HeaderProps> = ({
                   }`}
                 >
                   Services
+                </button>
+                <button
+                  type="button"
+                  id="header-view-tasks-btn"
+                  onClick={() => onViewChange('tasks')}
+                  className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs font-semibold transition flex items-center gap-1.5 ${
+                    currentView === 'tasks'
+                      ? 'bg-white text-indigo-700 shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span>Tasks</span>
+                  {urgentTaskCount > 0 && (
+                    <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-2xs animate-pulse">
+                      {urgentTaskCount}
+                    </span>
+                  )}
                 </button>
               </div>
             </div>

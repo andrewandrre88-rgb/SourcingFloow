@@ -303,4 +303,33 @@ export interface ExpenseItem {
   updatedAt: string;
 }
 
+// ----------------- TO-DO LIST & TASK MANAGEMENT TYPES -----------------
+export type TaskPriority = 'urgent' | 'high' | 'medium' | 'low';
+export type TaskStatus = 'todo' | 'in_progress' | 'completed';
+export type TaskCategory =
+  | 'Sourcing & 1688'
+  | 'Factory & Samples'
+  | 'Client Follow-up'
+  | 'QC & Inspection'
+  | 'Shipping & Logistics'
+  | 'Payments & Finance'
+  | 'General';
+
+export interface SourcingTask {
+  id: string; // Unique ID (e.g. task_001)
+  title: string; // Task name / action needed
+  description?: string; // Detailed instructions or requirements
+  priority: TaskPriority; // 'urgent' | 'high' | 'medium' | 'low'
+  status: TaskStatus; // 'todo' | 'in_progress' | 'completed'
+  category: TaskCategory; // Sourcing, Factory, QC, etc.
+  dueDate?: string; // YYYY-MM-DD
+  linkedInquiryId?: string; // Optional ID of linked inquiry
+  linkedInquiryNumber?: string; // Optional INQ-2026-001
+  clientName?: string; // Optional client name
+  completedAt?: string; // ISO date string when marked completed
+  orderIndex?: number; // Custom drag/sort priority order
+  createdAt: string;
+  updatedAt: string;
+}
+
 

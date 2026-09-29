@@ -33,6 +33,7 @@ import {
   CreditCard,
   Tag,
   Palette,
+  Split,
 } from 'lucide-react';
 import { InquiryItem, OrderStatus } from '../types';
 import {
@@ -67,6 +68,7 @@ interface InquiryDetailModalProps {
   onDuplicate?: (item: InquiryItem) => void;
   onDeleteRequest?: (item: InquiryItem) => void;
   onStatusChange: (item: InquiryItem, newStatus: OrderStatus) => void;
+  onSplitInquiry?: (item: InquiryItem) => void;
 }
 
 const ALL_STATUSES: OrderStatus[] = [
@@ -94,6 +96,7 @@ export const InquiryDetailModal: React.FC<InquiryDetailModalProps> = ({
   onDuplicate,
   onDeleteRequest,
   onStatusChange,
+  onSplitInquiry,
 }) => {
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
@@ -445,8 +448,21 @@ export const InquiryDetailModal: React.FC<InquiryDetailModalProps> = ({
                     {item.products.length} Items Requested
                   </span>
                 </div>
-                <div className="text-xs font-semibold text-slate-700">
-                  Total Order Volume: <strong className="text-indigo-700 font-bold font-mono">{Number(item.quantity).toLocaleString()} {item.quantityUnit || 'pcs'}</strong>
+                <div className="flex items-center gap-3">
+                  <div className="text-xs font-semibold text-slate-700">
+                    Total Order Volume: <strong className="text-indigo-700 font-bold font-mono">{Number(item.quantity).toLocaleString()} {item.quantityUnit || 'pcs'}</strong>
+                  </div>
+                  {onSplitInquiry && (
+                    <button
+                      type="button"
+                      onClick={() => onSplitInquiry(item)}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-white hover:bg-indigo-600 text-indigo-700 hover:text-white border border-indigo-200 text-xs font-bold transition shadow-2xs cursor-pointer"
+                      title="Split each product/color into its own separate inquiry row in your database"
+                    >
+                      <Split className="w-3.5 h-3.5" />
+                      <span>Split into Separate Inquiries</span>
+                    </button>
+                  )}
                 </div>
               </div>
 

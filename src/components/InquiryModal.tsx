@@ -43,6 +43,7 @@ import {
   ArrowUp,
   ArrowDown,
   Palette,
+  Split,
 } from 'lucide-react';
 import {
   InquiryItem,
@@ -78,10 +79,11 @@ import { COUNTRIES } from '../lib/countryFlags';
 interface InquiryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (item: InquiryItem) => void;
+  onSave: (item: InquiryItem | InquiryItem[]) => void;
   inquiryToEdit: InquiryItem | null;
   exchangeRates: ExchangeRates;
   existingCount: number;
+  allInquiries?: InquiryItem[];
 }
 
 const COMMON_COUNTRIES = COUNTRIES.map((c) => c.name);
@@ -96,6 +98,59 @@ const HELPER_ROLES = [
   'Other',
 ];
 
+/**
+ * Generates sequential, collision-free inquiry numbers for separate products
+ */
+export const getSequentialInquiryNumbers = (
+  baseNumber: string,
+  count: number,
+  existingItems: InquiryItem[] = []
+): string[] => {
+  const currentYear = new Date().getFullYear();
+  const prefix = `INQ-${currentYear}-`;
+
+  // Find max numeric sequence from all existing inquiries
+  let maxSeq = 0;
+  existingItems.forEach((it) => {
+    if (it.inquiryNumber && it.inquiryNumber.startsWith(prefix)) {
+      const match = it.inquiryNumber.match(new RegExp(`^${prefix}(\\d+)`));
+      if (match) {
+        const val = parseInt(match[1], 10);
+        if (!isNaN(val) && val > maxSeq) {
+          maxSeq = val;
+        }
+      }
+    }
+  });
+
+  const results: string[] = [];
+  const usedNumbers = new Set(existingItems.map((it) => it.inquiryNumber));
+
+  // Determine starting number
+  let currentSeq = maxSeq + 1;
+  const baseMatch = baseNumber?.match(new RegExp(`^${prefix}(\\d+)`));
+  if (baseMatch) {
+    results.push(baseNumber);
+    usedNumbers.add(baseNumber);
+  } else {
+    const firstNum = `${prefix}${String(currentSeq).padStart(3, '0')}`;
+    results.push(firstNum);
+    usedNumbers.add(firstNum);
+    currentSeq++;
+  }
+
+  while (results.length < count) {
+    const candidate = `${prefix}${String(currentSeq).padStart(3, '0')}`;
+    if (!usedNumbers.has(candidate)) {
+      results.push(candidate);
+      usedNumbers.add(candidate);
+    }
+    currentSeq++;
+  }
+
+  return results;
+};
+
 export const InquiryModal: React.FC<InquiryModalProps> = ({
   isOpen,
   onClose,
@@ -103,6 +158,7 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
   inquiryToEdit,
   exchangeRates,
   existingCount,
+  allInquiries = [],
 }) => {
   const [formData, setFormData] = useState<Partial<InquiryItem>>({
     inquiryNumber: '',
@@ -954,6 +1010,18 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
     const calculatedTotalQty = productsList.reduce((sum, p) => sum + (Number(p.quantity) || 0), 0);
     const finalQuantity = calculatedTotalQty > 0 ? calculatedTotalQty : (Number(formData.quantity) || 1);
 
+    const compositeProductTitle =
+      productsList.length > 1
+        ? productsList
+            .map((p) =>
+              p.productName?.trim()
+                ? `${p.productName.trim()}${p.colorVariant?.trim() ? ` (${p.colorVariant.trim()})` : ''}`
+                : ''
+            )
+            .filter(Boolean)
+            .join(' • ') || effectiveProductName
+        : effectiveProductName;
+
     const finalItem: InquiryItem = {
       id: formData.id || `inq_${Date.now()}`,
       inquiryNumber:
@@ -964,17 +1032,17 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
       customerContact: formData.customerContact?.trim() || '',
       wechatId: formData.wechatId?.trim() || undefined,
       country: formData.country?.trim() || 'Global',
-      product: effectiveProductName,
+      product: compositeProductTitle,
       products: productsList.map((p, idx) => ({
         id: p.id || `prod_${Date.now()}_${idx}`,
-        productName: p.productName?.trim() || effectiveProductName,
+        productName: p.productName?.trim() || (productsList.length > 1 ? `Item #${idx + 1}` : effectiveProductName),
         colorVariant: p.colorVariant?.trim() || '',
         quantity: Math.max(1, Number(p.quantity) || 1),
         quantityUnit: p.quantityUnit || formData.quantityUnit || 'pcs',
         material: p.material?.trim() || '',
         targetPriceUsd: p.targetPriceUsd !== undefined && !isNaN(Number(p.targetPriceUsd)) ? Number(p.targetPriceUsd) : undefined,
         targetPriceRmb: p.targetPriceRmb !== undefined && !isNaN(Number(p.targetPriceRmb)) ? Number(p.targetPriceRmb) : undefined,
-        price1688Rmb: p.price1688Rmb !== undefined && !isNaN(Number(p.price1688Rmb)) ? Number(p.price1688Rmb) : undefined,
+        price1688Rmb: p.price1688Rmb !== undefined && !isNaN(Number(p.price1688Rmb)) ? Number(p.price1688Rmb) : (!isNaN(Number(activePrice1688)) ? Number(activePrice1688) : 0),
         clientUnitPriceUsd: p.clientUnitPriceUsd !== undefined && !isNaN(Number(p.clientUnitPriceUsd)) ? Number(p.clientUnitPriceUsd) : undefined,
         imageUrl: p.imageUrl || '',
         supplierUrl: p.supplierUrl?.trim() || '',
@@ -1317,53 +1385,57 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
                 title="Add another product or color variant to this inquiry"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Add Product / Color</span>
+                <span>+ Add Item / Color</span>
               </button>
             </div>
 
-            {/* List of Products / Variants */}
+            {/* List of Products / Variants - Saved Separately Inside This Form */}
             <div className="space-y-3">
               {productsList.map((productItem, prodIdx) => {
                 const isOnlyOne = productsList.length === 1;
                 return (
                   <div
                     key={productItem.id || `prod_${prodIdx}`}
-                    className={`border rounded-lg p-3.5 transition-all ${
+                    className={`border-2 rounded-xl p-3.5 sm:p-4 transition-all space-y-3 ${
                       productsList.length > 1
-                        ? 'bg-white border-slate-200 shadow-2xs hover:border-indigo-200'
+                        ? 'bg-white border-indigo-200/90 shadow-2xs hover:border-indigo-400'
                         : 'bg-white border-slate-200'
                     }`}
                   >
-                    {/* Header bar for multi-product items */}
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-3">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="px-2 py-0.5 rounded bg-indigo-50 border border-indigo-200 text-indigo-700 font-mono font-bold text-xs">
+                    {/* Header bar for item */}
+                    <div className="flex flex-wrap items-center justify-between border-b border-slate-100 pb-2.5 gap-2">
+                      <div className="flex items-center gap-2 flex-wrap min-w-0">
+                        <span className="px-2.5 py-1 rounded-md bg-indigo-600 text-white font-mono font-bold text-xs shadow-2xs tracking-wide">
                           Item #{prodIdx + 1}
                         </span>
-                        <span className="font-semibold text-xs text-slate-800 truncate">
-                          {productItem.productName?.trim() || `Product #${prodIdx + 1}`}
+                        <span className="font-bold text-xs sm:text-sm text-slate-800 truncate max-w-[180px] sm:max-w-[260px]">
+                          {productItem.productName?.trim() || `Item #${prodIdx + 1}`}
                         </span>
                         {productItem.colorVariant && (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-medium truncate">
-                            <Palette className="w-2.5 h-2.5 text-amber-600" />
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-semibold truncate">
+                            <Palette className="w-3 h-3 text-amber-600" />
                             {productItem.colorVariant}
                           </span>
                         )}
-                        <span className="text-[11px] font-semibold text-slate-600">
-                          ({Number(productItem.quantity || 0).toLocaleString()} {productItem.quantityUnit || 'pcs'})
+                        <span className="text-[11px] font-mono font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded">
+                          {Number(productItem.quantity || 0).toLocaleString()} {productItem.quantityUnit || 'pcs'}
+                        </span>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                          <CheckCircle className="w-3 h-3 text-emerald-600" />
+                          Saved separately inside form
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-1 shrink-0">
+                      <div className="flex items-center gap-1.5 shrink-0">
                         {/* 1-Click Duplicate / Add Another Color */}
                         <button
                           type="button"
                           onClick={() => handleDuplicateProduct(prodIdx)}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 transition border border-transparent hover:border-indigo-200"
-                          title="Duplicate this product with same specs (ideal for adding another color or size)"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 transition border border-indigo-200 cursor-pointer shadow-2xs"
+                          title="Duplicate this item to add another color or size inside this form"
                         >
-                          <Copy className="w-3 h-3" />
-                          <span className="hidden sm:inline">Duplicate / Add Color</span>
+                          <Copy className="w-3.5 h-3.5 text-indigo-600" />
+                          <span className="hidden sm:inline">Duplicate / New Color</span>
                         </button>
 
                         {/* Reorder Up/Down */}
@@ -1374,7 +1446,7 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
                               disabled={prodIdx === 0}
                               onClick={() => handleMoveProduct(prodIdx, 'up')}
                               className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 transition"
-                              title="Move product up"
+                              title="Move item up"
                             >
                               <ArrowUp className="w-3 h-3" />
                             </button>
@@ -1383,7 +1455,7 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
                               disabled={prodIdx === productsList.length - 1}
                               onClick={() => handleMoveProduct(prodIdx, 'down')}
                               className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 transition border-l border-slate-200"
-                              title="Move product down"
+                              title="Move item down"
                             >
                               <ArrowDown className="w-3 h-3" />
                             </button>
@@ -1396,7 +1468,7 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
                             type="button"
                             onClick={() => handleRemoveProduct(prodIdx)}
                             className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition"
-                            title="Remove this product"
+                            title="Remove this item"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -1463,7 +1535,7 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
                                 value={productItem.quantityUnit || formData.quantityUnit || 'pcs'}
                                 onChange={(e) => {
                                   handleUpdateProduct(prodIdx, 'quantityUnit', e.target.value);
-                                  if (prodIdx === 0) setFormData(prev => ({ ...prev, quantityUnit: e.target.value }));
+                                  if (prodIdx === 0) setFormData((prev) => ({ ...prev, quantityUnit: e.target.value }));
                                 }}
                                 className="px-2 py-1.5 bg-slate-100 border border-l-0 border-slate-300 rounded-r text-xs font-semibold text-slate-700 focus:outline-none focus:border-indigo-500 cursor-pointer"
                               >
@@ -1519,16 +1591,64 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
                           </div>
                         </div>
 
-                        {/* Optional Sourcing Link / Specs note */}
-                        <div className="pt-0.5">
-                          <input
-                            type="text"
-                            placeholder="Optional 1688 / Supplier link or specific notes for this product..."
-                            value={productItem.supplierUrl || ''}
-                            onChange={(e) => handleUpdateProduct(prodIdx, 'supplierUrl', e.target.value)}
-                            className="w-full px-2 py-1 bg-slate-50/70 border border-slate-200 rounded text-[11px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white"
-                          />
+                        {/* Row 3: Factory / 1688 Cost & Sourcing Link */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-0.5">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                              1688 / Factory Cost (¥ RMB)
+                            </label>
+                            <div className="relative">
+                              <span className="absolute left-2.5 top-1.5 text-slate-400 text-xs">¥</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="any"
+                                placeholder={`Default ¥${activePrice1688}`}
+                                value={productItem.price1688Rmb !== undefined ? productItem.price1688Rmb : ''}
+                                onChange={(e) =>
+                                  handleUpdateProduct(
+                                    prodIdx,
+                                    'price1688Rmb',
+                                    e.target.value === '' ? undefined : Number(e.target.value)
+                                  )
+                                }
+                                className="w-full pl-6 pr-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800 font-mono focus:outline-none focus:border-indigo-500 focus:bg-white shadow-xs"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="sm:col-span-2">
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                              Sourcing Link (1688 / Factory URL)
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. https://detail.1688.com/offer/..."
+                              value={productItem.supplierUrl || ''}
+                              onChange={(e) => handleUpdateProduct(prodIdx, 'supplierUrl', e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white shadow-xs"
+                            />
+                          </div>
                         </div>
+
+                        {/* Item Subtotal Calculation preview */}
+                        {(() => {
+                          const cost = productItem.price1688Rmb !== undefined ? Number(productItem.price1688Rmb) : activePrice1688;
+                          const qty = Math.max(1, Number(productItem.quantity) || 1);
+                          const subtotalRmb = cost * qty;
+                          const rate = exchangeRates.USD_TO_RMB > 0 ? exchangeRates.USD_TO_RMB : 7.25;
+                          const subtotalUsd = (subtotalRmb / rate).toFixed(2);
+                          return (
+                            <div className="flex items-center justify-between text-[11px] px-2.5 py-1 bg-slate-100 rounded border border-slate-200 text-slate-700">
+                              <span>
+                                Item #{prodIdx + 1} Cost: <strong className="font-mono font-bold text-slate-900">{qty.toLocaleString()} {productItem.quantityUnit || 'pcs'} × ¥{cost.toFixed(2)}</strong>
+                              </span>
+                              <span className="font-mono font-bold text-indigo-700">
+                                = ¥{subtotalRmb.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (~${subtotalUsd} USD)
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       {/* Product Image Tile for this item */}
@@ -1538,7 +1658,7 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
                         </label>
                         <div
                           onClick={() => document.getElementById(`modal-product-img-input-${prodIdx}`)?.click()}
-                          className="flex flex-col items-center justify-center border border-dashed border-slate-300 bg-white hover:bg-slate-50 cursor-pointer rounded-lg p-2 h-28 transition-colors relative overflow-hidden group shadow-xs"
+                          className="flex flex-col items-center justify-center border border-dashed border-slate-300 bg-white hover:bg-slate-50 cursor-pointer rounded-lg p-2 h-32 transition-colors relative overflow-hidden group shadow-xs"
                         >
                           <input
                             id={`modal-product-img-input-${prodIdx}`}
@@ -1563,7 +1683,7 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleUpdateProduct(prodIdx, 'imageUrl', '');
-                                    if (prodIdx === 0) setFormData(prev => ({ ...prev, imageUrl: '' }));
+                                    if (prodIdx === 0) setFormData((prev) => ({ ...prev, imageUrl: '' }));
                                   }}
                                   className="mt-1 text-[9px] text-rose-300 hover:text-rose-100 underline"
                                 >
@@ -1593,20 +1713,20 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
               <button
                 type="button"
                 onClick={handleAddProduct}
-                className="w-full sm:w-auto px-4 py-2 border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/50 hover:bg-indigo-50 rounded-lg text-xs font-semibold text-indigo-700 flex items-center justify-center gap-1.5 transition cursor-pointer"
+                className="w-full sm:w-auto px-4 py-2 border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/50 hover:bg-indigo-50 rounded-lg text-xs font-semibold text-indigo-700 flex items-center justify-center gap-1.5 transition cursor-pointer shadow-2xs"
               >
                 <Plus className="w-4 h-4" />
-                <span>+ Add Another Product / Color Variant</span>
+                <span>+ Add Item #{productsList.length + 1} (Different Product or Color Variant)</span>
               </button>
 
               {productsList.length > 1 && (
                 <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg px-3 py-1.5 shadow-2xs">
-                  <span className="text-slate-500 font-normal">Combined Total:</span>
+                  <span className="text-slate-500 font-normal">All Items in Form:</span>
                   <span className="text-indigo-600 font-bold font-mono">
                     {productsList.reduce((acc, p) => acc + (Number(p.quantity) || 0), 0).toLocaleString()} {formData.quantityUnit || 'pcs'}
                   </span>
                   <span className="text-slate-400">•</span>
-                  <span>{productsList.length} items</span>
+                  <span>{productsList.length} items saved separately inside</span>
                 </div>
               )}
             </div>
@@ -3560,10 +3680,12 @@ export const InquiryModal: React.FC<InquiryModalProps> = ({
             <button
               id="modal-save-inquiry-btn"
               type="submit"
-              className="flex items-center space-x-1 px-4 py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition active:scale-95"
+              className="flex items-center space-x-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition active:scale-95 cursor-pointer"
             >
-              <CheckCircle className="w-3.5 h-3.5" />
-              <span>{inquiryToEdit ? 'Update Inquiry' : 'Save & Sync Inquiry'}</span>
+              <CheckCircle className="w-4 h-4" />
+              <span>
+                {inquiryToEdit ? 'Update Inquiry' : 'Save Sourcing Inquiry'} ({productsList.length} {productsList.length === 1 ? 'Item' : 'Items Saved Inside'})
+              </span>
             </button>
           </div>
         </form>
