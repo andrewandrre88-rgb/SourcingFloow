@@ -28,8 +28,8 @@ interface HeaderProps {
   onOpenNewModal: () => void;
   onOpenRatesModal: () => void;
   isLoggingIn: boolean;
-  currentView: 'inquiries' | 'customers' | 'services' | 'tasks';
-  onViewChange: (view: 'inquiries' | 'customers' | 'services' | 'tasks') => void;
+  currentView: 'inquiries' | 'products' | 'customers' | 'services' | 'tasks';
+  onViewChange: (view: 'inquiries' | 'products' | 'customers' | 'services' | 'tasks') => void;
   urgentTaskCount?: number;
 }
 
@@ -180,7 +180,7 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Bottom Row: View Switcher (Inquiries / Customers / Services) & Currency Toggle */}
             <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-100">
               {/* View Switcher */}
-              <div className="flex-1 grid grid-cols-4 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs font-semibold">
+              <div className="flex-1 grid grid-cols-5 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs font-semibold">
                 <button
                   type="button"
                   id="header-mobile-view-inquiries-btn"
@@ -192,6 +192,18 @@ export const Header: React.FC<HeaderProps> = ({
                   }`}
                 >
                   Inquiries
+                </button>
+                <button
+                  type="button"
+                  id="header-mobile-view-products-btn"
+                  onClick={() => onViewChange('products')}
+                  className={`py-1.5 px-1 rounded-md text-[11px] sm:text-xs font-semibold transition text-center truncate ${
+                    currentView === 'products'
+                      ? 'bg-white text-indigo-700 shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Products
                 </button>
                 <button
                   type="button"
@@ -306,6 +318,18 @@ export const Header: React.FC<HeaderProps> = ({
                   }`}
                 >
                   Inquiries
+                </button>
+                <button
+                  type="button"
+                  id="header-view-products-btn"
+                  onClick={() => onViewChange('products')}
+                  className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs font-semibold transition ${
+                    currentView === 'products'
+                      ? 'bg-white text-indigo-700 shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Products
                 </button>
                 <button
                   type="button"

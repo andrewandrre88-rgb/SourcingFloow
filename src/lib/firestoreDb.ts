@@ -1,5 +1,4 @@
 import {
-  initializeFirestore,
   getFirestore,
   doc,
   setDoc,
@@ -12,7 +11,6 @@ import {
   writeBatch,
   getDocs,
   serverTimestamp,
-  getDocFromServer,
   Firestore,
 } from 'firebase/firestore';
 import { User } from 'firebase/auth';
@@ -21,38 +19,10 @@ import firebaseConfig from '../../firebase-applet-config.json';
 import { InquiryItem, ExchangeRates, OrderStatus } from '../types';
 import { DEFAULT_EXCHANGE_RATES } from './currency';
 
-// Initialize Firestore with experimentalForceLongPolling to prevent iframe WebSocket drops
-let firestoreInstance: Firestore;
-try {
-  firestoreInstance = firebaseConfig.firestoreDatabaseId
-    ? initializeFirestore(
-        app,
-        {
-          experimentalForceLongPolling: true,
-        },
-        firebaseConfig.firestoreDatabaseId
-      )
-    : initializeFirestore(app, {
-        experimentalForceLongPolling: true,
-      });
-} catch {
-  firestoreInstance = firebaseConfig.firestoreDatabaseId
-    ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
-    : getFirestore(app);
-}
-
-export const db = firestoreInstance;
-
-// Test Firestore connection on boot per Firebase skill guidelines
-async function testConnection() {
-  try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-  } catch (error: any) {
-    // Graceful offline fallback: Firestore will use long-polling and local persistence
-    console.info('[Firestore] Operating with offline persistence and long-polling connection fallback.');
-  }
-}
-testConnection();
+// Initialize Firestore singleton per Firebase Integration Skill guidelines
+export const db: Firestore = firebaseConfig.firestoreDatabaseId
+  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
+  : getFirestore(app);
 
 export enum OperationType {
   CREATE = 'create',

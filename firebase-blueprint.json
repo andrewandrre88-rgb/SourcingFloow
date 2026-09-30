@@ -524,6 +524,182 @@
           "required": true
         }
       }
+    },
+    "CatalogProduct": {
+      "collection": "users/{userId}/products",
+      "path": "/users/{userId}/products/{productId}",
+      "description": "Master product database with cartons, units per carton, dimensions, CBM, EXW, FOB and materials",
+      "fields": {
+        "id": {
+          "type": "string",
+          "required": true
+        },
+        "itemCode": {
+          "type": "string",
+          "required": false
+        },
+        "name": {
+          "type": "string",
+          "required": true
+        },
+        "category": {
+          "type": "string",
+          "required": false
+        },
+        "material": {
+          "type": "string",
+          "required": true
+        },
+        "quantity": {
+          "type": "number",
+          "required": true
+        },
+        "quantityUnit": {
+          "type": "string",
+          "required": false
+        },
+        "unitsPerCarton": {
+          "type": "number",
+          "required": true
+        },
+        "cartons": {
+          "type": "number",
+          "required": true
+        },
+        "cartonLengthCm": {
+          "type": "number",
+          "required": true
+        },
+        "cartonWidthCm": {
+          "type": "number",
+          "required": true
+        },
+        "cartonHeightCm": {
+          "type": "number",
+          "required": true
+        },
+        "cartonCbm": {
+          "type": "number",
+          "required": false
+        },
+        "totalCbm": {
+          "type": "number",
+          "required": false
+        },
+        "grossWeightKg": {
+          "type": "number",
+          "required": false
+        },
+        "totalGrossWeightKg": {
+          "type": "number",
+          "required": false
+        },
+        "netWeightKg": {
+          "type": "number",
+          "required": false
+        },
+        "exwPrice": {
+          "type": "number",
+          "required": true
+        },
+        "exwCurrency": {
+          "type": "string",
+          "required": true
+        },
+        "fobPrice": {
+          "type": "number",
+          "required": true
+        },
+        "fobCurrency": {
+          "type": "string",
+          "required": true
+        },
+        "fobPort": {
+          "type": "string",
+          "required": false
+        },
+        "targetPriceUsd": {
+          "type": "number",
+          "required": false
+        },
+        "supplierName": {
+          "type": "string",
+          "required": false
+        },
+        "supplierUrl": {
+          "type": "string",
+          "required": false
+        },
+        "supplierContact": {
+          "type": "string",
+          "required": false
+        },
+        "hsCode": {
+          "type": "string",
+          "required": false
+        },
+        "packagingType": {
+          "type": "string",
+          "required": false
+        },
+        "colorVariants": {
+          "type": "string",
+          "required": false
+        },
+        "imageUrl": {
+          "type": "string",
+          "required": false
+        },
+        "notes": {
+          "type": "string",
+          "required": false
+        },
+        "cartons20gp": {
+          "type": "number",
+          "required": false
+        },
+        "qty20gp": {
+          "type": "number",
+          "required": false
+        },
+        "cartons40gp": {
+          "type": "number",
+          "required": false
+        },
+        "qty40gp": {
+          "type": "number",
+          "required": false
+        },
+        "cartons40hc": {
+          "type": "number",
+          "required": false
+        },
+        "qty40hc": {
+          "type": "number",
+          "required": false
+        },
+        "cartons45hc": {
+          "type": "number",
+          "required": false
+        },
+        "qty45hc": {
+          "type": "number",
+          "required": false
+        },
+        "factoryQuotes": {
+          "type": "array",
+          "required": false,
+          "description": "Multi-factory quotation comparison list (Factory 1, Factory 2, etc.)"
+        },
+        "createdAt": {
+          "type": "string",
+          "required": true
+        },
+        "updatedAt": {
+          "type": "string",
+          "required": true
+        }
+      }
     }
   },
   "securityRules": {

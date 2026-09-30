@@ -332,4 +332,67 @@ export interface SourcingTask {
   updatedAt: string;
 }
 
+// ----------------- FACTORY QUOTATION SPECIFICATIONS -----------------
+export interface FactoryQuote {
+  id: string; // Unique ID (e.g. fq_1)
+  factoryName: string; // e.g. "Factory 1 (Hebei Glass)", "Factory 2 (Ningbo Precision)"
+  price: number; // Unit quote price
+  currency: CurrencyUnit; // 'RMB' or 'USD'
+  moq?: number; // Minimum Order Quantity in units
+  leadTimeDays?: number; // Production lead time in calendar days
+  contactPerson?: string; // WeChat / WhatsApp / Phone / Contact
+  supplierUrl?: string; // 1688 / Website URL
+  notes?: string; // Terms, quality level, packaging included, fapiao
+  isPrimary?: boolean; // Selected winning quote / primary supplier
+  quotationDate?: string; // Date quote received
+}
+
+// ----------------- MASTER PRODUCT CATALOG SPECIFICATIONS -----------------
+export interface CatalogProduct {
+  id: string; // Unique ID (e.g. PROD-001)
+  itemCode?: string; // SKU, Model Number, or Factory Code
+  name: string; // Product title & description
+  category?: string; // Product category (e.g. Glassware, Drinkware, Electronics, Textiles)
+  material: string; // Material & composition (e.g. "Borosilicate Glass", "304 Stainless Steel")
+  quantity: number; // Order / MOQ / Batch quantity
+  quantityUnit?: string; // 'pcs', 'sets', 'pairs', 'packs', 'units', 'boxes'
+  unitsPerCarton: number; // Units per carton (pcs/ctn)
+  cartons: number; // Total number of cartons
+  cartonLengthCm: number; // Carton length in cm
+  cartonWidthCm: number; // Carton width in cm
+  cartonHeightCm: number; // Carton height in cm
+  cartonCbm?: number; // Single carton volume in CBM (m³) = (L * W * H) / 1,000,000
+  totalCbm?: number; // Total shipment volume in CBM = cartons * cartonCbm
+  grossWeightKg?: number; // Gross weight per carton in kg
+  totalGrossWeightKg?: number; // Total gross weight in kg = cartons * grossWeightKg
+  netWeightKg?: number; // Net weight per carton in kg
+  exwPrice: number; // EXW Price (Ex Works factory gate)
+  exwCurrency: CurrencyUnit; // 'RMB' or 'USD'
+  fobPrice: number; // FOB Price (Free On Board loaded onto ship)
+  fobCurrency: CurrencyUnit; // 'USD' or 'RMB'
+  fobPort?: string; // Port of loading (e.g. Ningbo, Shenzhen, Shanghai, Guangzhou, Yiwu)
+  targetPriceUsd?: number; // Client target / selling quotation ($)
+  supplierName?: string; // Factory / Supplier name
+  supplierUrl?: string; // 1688 / Alibaba / Factory URL
+  supplierContact?: string; // WeChat / WhatsApp / Phone
+  hsCode?: string; // Customs HS Code
+  packagingType?: string; // Packaging description (e.g. "5-ply export carton, 1pc/color box")
+  colorVariants?: string; // Colors, finishes, or size options
+  imageUrl?: string; // Photo or reference image URL
+  notes?: string; // Quality standards, inspection checklist, barcode specs
+  // Container Loading Specifications (20GP, 40GP, 40HC, 45HC)
+  cartons20gp?: number; // Estimated / Saved Cartons in 20GP container (~28 CBM)
+  qty20gp?: number; // Total Quantity in 20GP container
+  cartons40gp?: number; // Estimated / Saved Cartons in 40GP container (~58 CBM)
+  qty40gp?: number; // Total Quantity in 40GP container
+  cartons40hc?: number; // Estimated / Saved Cartons in 40HC / 40HQ container (~68 CBM)
+  qty40hc?: number; // Total Quantity in 40HC container
+  cartons45hc?: number; // Estimated / Saved Cartons in 45HC / 45HQ container (~78 CBM)
+  qty45hc?: number; // Total Quantity in 45HC container
+  // Different factory quotations (Factory 1, Factory 2, Factory 3, etc.)
+  factoryQuotes?: FactoryQuote[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 

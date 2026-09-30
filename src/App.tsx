@@ -42,6 +42,10 @@ import { ExpensesPage } from './components/ExpensesPage';
 import { ExpenseModal } from './components/ExpenseModal';
 import { TasksPage } from './components/TasksPage';
 import { TaskModal } from './components/TaskModal';
+import { ProductsPage } from './components/ProductsPage';
+import { ProductModal } from './components/ProductModal';
+import { ProductDetailModal } from './components/ProductDetailModal';
+import { CatalogProduct } from './types';
 import { subscribeToCustomers, saveCustomerToFirestore, deleteCustomerFromFirestore } from './lib/customersDb';
 import {
   subscribeToServices,
@@ -66,6 +70,15 @@ import {
   migrateLocalTasksToFirestoreIfEmpty,
   batchSaveTasksToFirestore,
 } from './lib/tasksDb';
+import {
+  loadLocalProducts,
+  saveLocalProducts,
+  subscribeToProducts,
+  saveProductToFirestore,
+  deleteProductFromFirestore,
+  migrateLocalProductsToFirestoreIfEmpty,
+  batchSaveProductsToFirestore,
+} from './lib/productsDb';
 import {
   CheckCircle2,
   AlertCircle,
@@ -119,7 +132,8 @@ export default function App() {
   const [services, setServices] = useState<ServiceRequest[]>(getLocalServices);
   const [expenses, setExpenses] = useState<ExpenseItem[]>(getLocalExpenses);
   const [tasks, setTasks] = useState<SourcingTask[]>(loadLocalTasks);
-  const [currentView, setCurrentView] = useState<'inquiries' | 'customers' | 'services' | 'tasks'>('inquiries');
+  const [products, setProducts] = useState<CatalogProduct[]>(loadLocalProducts);
+  const [currentView, setCurrentView] = useState<'inquiries' | 'products' | 'customers' | 'services' | 'tasks'>('inquiries');
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [customerToEdit, setCustomerToEdit] = useState<Customer | null>(null);
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
@@ -129,6 +143,9 @@ export default function App() {
   const [expenseToEdit, setExpenseToEdit] = useState<ExpenseItem | null>(null);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState<SourcingTask | null>(null);
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [productToEdit, setProductToEdit] = useState<CatalogProduct | null>(null);
+  const [productToView, setProductToView] = useState<CatalogProduct | null>(null);
 
   // Urgent / High priority task metrics for header badge
   const urgentTaskCount = tasks.filter(
@@ -198,15 +215,18 @@ export default function App() {
     if (!user) return;
     setSyncState((prev) => ({ ...prev, isSyncing: true }));
     try {
-      showToast('Syncing all tasks & inquiries with Cloud Firestore...', 'info');
-      await batchSaveTasksToFirestore(user.uid, tasks);
+      showToast('Syncing products, tasks & inquiries with Cloud Firestore...', 'info');
+      await Promise.all([
+        batchSaveTasksToFirestore(user.uid, tasks),
+        batchSaveProductsToFirestore(user.uid, products),
+      ]);
       setSyncState((prev) => ({
         ...prev,
         isSyncing: false,
         status: 'connected',
         lastSyncedAt: new Date().toISOString(),
       }));
-      showToast('All tasks & inquiries synchronized across all devices!', 'success');
+      showToast('All products, tasks & inquiries synchronized across all devices!', 'success');
     } catch (err: any) {
       console.error(err);
       setSyncState((prev) => ({ ...prev, isSyncing: false, error: 'Sync failed' }));
@@ -779,6 +799,138 @@ export default function App() {
     }
   };
 
+  // ----------------- MASTER PRODUCT HANDLERS -----------------
+  const handleSaveProduct = async (savedProduct: CatalogProduct) => {
+    setProducts((prev) => {
+      const idx = prev.findIndex((p) => p.id === savedProduct.id);
+      let next: CatalogProduct[];
+      if (idx >= 0) {
+        next = [...prev];
+        next[idx] = savedProduct;
+      } else {
+        next = [savedProduct, ...prev];
+      }
+      saveLocalProducts(next);
+      return next;
+    });
+    setIsProductModalOpen(false);
+    setProductToEdit(null);
+    showToast(`Saved product specifications for "${savedProduct.name}"`, 'success');
+
+    if (user && user.uid) {
+      try {
+        await saveProductToFirestore(user.uid, savedProduct);
+      } catch (error: any) {
+        console.error('Failed to save product to Firestore:', error);
+      }
+    }
+  };
+
+  const handleDeleteProduct = async (productId: string) => {
+    setProducts((prev) => {
+      const next = prev.filter((p) => p.id !== productId);
+      saveLocalProducts(next);
+      return next;
+    });
+    if (productToView && productToView.id === productId) {
+      setProductToView(null);
+    }
+    showToast('Product removed from catalog', 'info');
+
+    if (user && user.uid) {
+      try {
+        await deleteProductFromFirestore(user.uid, productId);
+      } catch (e) {
+        console.error('Failed to delete product from Firestore:', e);
+      }
+    }
+  };
+
+  const handleDuplicateProduct = async (product: CatalogProduct) => {
+    const duplicated: CatalogProduct = {
+      ...product,
+      id: `prod_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      name: `${product.name} (Copy)`,
+      itemCode: product.itemCode ? `${product.itemCode}-COPY` : undefined,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setProducts((prev) => {
+      const next = [duplicated, ...prev];
+      saveLocalProducts(next);
+      return next;
+    });
+    showToast(`Duplicated "${product.name}"`, 'success');
+
+    if (user && user.uid) {
+      try {
+        await saveProductToFirestore(user.uid, duplicated);
+      } catch (e) {
+        console.error('Failed to duplicate product to Firestore:', e);
+      }
+    }
+  };
+
+  const handleCreateInquiryFromProduct = (product: CatalogProduct) => {
+    const usdRate = exchangeRates.USD_TO_RMB || 7.25;
+    const priceRmb = product.exwCurrency === 'RMB' ? product.exwPrice : Number((product.exwPrice * usdRate).toFixed(2));
+    const targetUsd = product.targetPriceUsd || (product.fobCurrency === 'USD' ? product.fobPrice : Number((product.fobPrice / usdRate).toFixed(2)));
+
+    setInquiryToEdit({
+      id: '',
+      inquiryNumber: '',
+      date: new Date().toISOString().split('T')[0],
+      customerName: '',
+      customerContact: '',
+      wechatId: product.supplierContact || '',
+      country: 'United States',
+      product: product.name,
+      material: product.material,
+      colorVariant: product.colorVariants || '',
+      packagingType: product.packagingType || '',
+      hsCode: product.hsCode || '',
+      boxLengthCm: product.cartonLengthCm,
+      boxWidthCm: product.cartonWidthCm,
+      boxHeightCm: product.cartonHeightCm,
+      pcsPerBox: product.unitsPerCarton,
+      grossWeightKg: product.grossWeightKg,
+      netWeightKg: product.netWeightKg,
+      productUrl1688: product.supplierUrl || '',
+      supplierName: product.supplierName || '',
+      quantity: product.quantity,
+      quantityUnit: product.quantityUnit || 'pcs',
+      price1688Rmb: priceRmb,
+      marginPercent: 25,
+      clientUnitPriceUsd: targetUsd || 0,
+      totalQuotationUsd: Number(((targetUsd || 0) * product.quantity).toFixed(2)),
+      estimatedProfitUsd: Number((((targetUsd || 0) * 0.25) * product.quantity).toFixed(2)),
+      imageUrl: product.imageUrl || '',
+      orderStatus: 'New Inquiry',
+      notes: product.notes || '',
+      updatedAt: new Date().toISOString(),
+      products: [
+        {
+          id: `p_${Date.now()}`,
+          productName: product.name,
+          colorVariant: product.colorVariants || '',
+          quantity: product.quantity,
+          quantityUnit: product.quantityUnit || 'pcs',
+          material: product.material,
+          targetPriceUsd: targetUsd,
+          targetPriceRmb: Number((targetUsd * usdRate).toFixed(2)),
+          price1688Rmb: priceRmb,
+          clientUnitPriceUsd: targetUsd,
+          imageUrl: product.imageUrl || '',
+          supplierUrl: product.supplierUrl || '',
+          hsCode: product.hsCode || '',
+          notes: product.notes || '',
+        },
+      ],
+    });
+    setIsInquiryModalOpen(true);
+    showToast(`Created new inquiry pre-filled with ${product.name}`, 'info');
+  };
+
   // Setup Firestore Subscriptions
   useEffect(() => {
     if (!user) return;
@@ -862,6 +1014,17 @@ export default function App() {
       }
     );
 
+    const unsubProducts = subscribeToProducts(
+      user.uid,
+      (data) => {
+        setProducts(data);
+        saveLocalProducts(data);
+      },
+      (error) => {
+        console.warn('[Firestore] Products listener warning:', error.message);
+      }
+    );
+
     migrateLocalDataToFirestoreIfEmpty(user.uid, inquiries, exchangeRates)
       .then((result) => {
         if (result.migrated && result.count > 0) {
@@ -882,6 +1045,16 @@ export default function App() {
         console.warn('[Firestore] Tasks migration warning:', err);
       });
 
+    migrateLocalProductsToFirestoreIfEmpty(user.uid, products)
+      .then((res) => {
+        if (res.migrated && res.count > 0) {
+          showToast(`Synced ${res.count} products across devices via Cloud Firestore`, 'success');
+        }
+      })
+      .catch((err) => {
+        console.warn('[Firestore] Products migration warning:', err);
+      });
+
     syncUserProfile(user).catch((err) => {
       console.warn('[Firestore] User profile sync warning:', err);
     });
@@ -893,6 +1066,7 @@ export default function App() {
       unsubServices();
       unsubExpenses();
       unsubTasks();
+      unsubProducts();
     };
   }, [user]);
 
@@ -954,6 +1128,9 @@ export default function App() {
           if (currentView === 'inquiries') {
             setInquiryToEdit(null);
             setIsInquiryModalOpen(true);
+          } else if (currentView === 'products') {
+            setProductToEdit(null);
+            setIsProductModalOpen(true);
           } else if (currentView === 'customers') {
             setCustomerToEdit(null);
             setIsCustomerModalOpen(true);
@@ -994,6 +1171,27 @@ export default function App() {
               onReorder={handleReorderInquiries}
             />
           </>
+        ) : currentView === 'products' ? (
+          <ProductsPage
+            products={products}
+            exchangeRates={exchangeRates}
+            currencyView={currencyView}
+            user={user}
+            syncState={syncState}
+            onSync={handleManualSync}
+            onAddProduct={() => {
+              setProductToEdit(null);
+              setIsProductModalOpen(true);
+            }}
+            onEditProduct={(prod) => {
+              setProductToEdit(prod);
+              setIsProductModalOpen(true);
+            }}
+            onViewProduct={(prod) => setProductToView(prod)}
+            onDeleteProduct={handleDeleteProduct}
+            onDuplicateProduct={handleDuplicateProduct}
+            onCreateInquiryFromProduct={handleCreateInquiryFromProduct}
+          />
         ) : currentView === 'customers' ? (
           <CustomersPage 
             customers={customers}
@@ -1081,6 +1279,9 @@ export default function App() {
             if (currentView === 'inquiries') {
               setInquiryToEdit(null);
               setIsInquiryModalOpen(true);
+            } else if (currentView === 'products') {
+              setProductToEdit(null);
+              setIsProductModalOpen(true);
             } else if (currentView === 'customers') {
               setCustomerToEdit(null);
               setIsCustomerModalOpen(true);
@@ -1214,6 +1415,40 @@ export default function App() {
         taskToEdit={taskToEdit}
         inquiries={inquiries}
         customers={customers}
+      />
+      <ProductModal
+        isOpen={isProductModalOpen}
+        onClose={() => {
+          setIsProductModalOpen(false);
+          setProductToEdit(null);
+        }}
+        onSave={handleSaveProduct}
+        productToEdit={productToEdit}
+        exchangeRates={exchangeRates}
+      />
+      <ProductDetailModal
+        isOpen={Boolean(productToView)}
+        onClose={() => setProductToView(null)}
+        product={productToView}
+        exchangeRates={exchangeRates}
+        currencyView={currencyView}
+        onEdit={(prod) => {
+          setProductToView(null);
+          setProductToEdit(prod);
+          setIsProductModalOpen(true);
+        }}
+        onDelete={(id) => {
+          handleDeleteProduct(id);
+          setProductToView(null);
+        }}
+        onDuplicate={(prod) => {
+          setProductToView(null);
+          handleDuplicateProduct(prod);
+        }}
+        onCreateInquiry={(prod) => {
+          setProductToView(null);
+          handleCreateInquiryFromProduct(prod);
+        }}
       />
       
       {/* Toast Notification */}
